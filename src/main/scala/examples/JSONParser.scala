@@ -6,13 +6,19 @@ object HelloJSON extends JSONParser {
 
   def main(args: Array[String]) {
 
-    val Parsed.Success(value, _) = extTriple.parse(
+    val parsed = projection.parse(
       io.Source.fromFile("data/scala-lang-contributions-short.json").mkString
     )
 
-    //println(value(0))
+    val Parsed.Success(value, _) = parsed
     println(value)
-    //assert(value(200)("friends")(1)("name").value == "Susan White") 
+
+    val parsed2 = projections.parse(
+      io.Source.fromFile("data/scala-lang-contributions.json").mkString
+    )
+
+    val Parsed.Success(value2, _) = parsed2
+    println(value2)
   }
 }
 
@@ -31,7 +37,6 @@ object Js {
   case class Unitt(value: Char) extends AnyVal with Val
   case class Str(value: java.lang.String) extends AnyVal with Val
   case class Obj(value: (java.lang.String, Val)*) extends AnyVal with Val
-  case class Trip(value: (Val, Val, Val)) extends AnyVal with Val
   case class Arr(value: Val*) extends AnyVal with Val
   case class Num(value: Double) extends AnyVal with Val
   case object False extends Val{
@@ -101,18 +106,29 @@ trait JSONParser {
    val notRightBracket = NamedFunction(!"]".contains(_: Char), "NotRightBracket")
    val anyCharNotRightBracket = P( CharsWhile(notRightBracket) )
    val notRightCurlyBracket = NamedFunction(!"}".contains(_: Char), "NotRightCurlyBracket")
-   val anyCharNotRightCurlyBracket = P( CharsWhile(notRightCurlyBracket) )
+   val untilRightCurlyBracket = P( CharsWhile(notRightCurlyBracket) )
+   val untilCommaFunction = NamedFunction(!",".contains(_: Char), "UntilComma")
+   val untilComma = P( CharsWhile(untilCommaFunction) )
 
+   val logged = scala.collection.mutable.Buffer.empty[String]
+   implicit val logger = fastparse.Logger(logged.append(_))
+   val stringPair = P( string ~ ":" ~ space ~ string ~ space ~ "," )
+
+   val unitToken = Js.Unitt('a')
    val weeks: Parser[Js.Unitt] = P( "\"weeks\"" ~ space ~ ":" ~ space ~ 
-     "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => Js.Unitt('a'))
+     "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => unitToken)
    val author: Parser[Js.Str] = P("\"author\"" ~ space ~ ":" ~ space ~ 
-     "{" ~ space ~ "\"login\"" ~ space ~ ":" ~ space ~ string ~ "," ~ anyCharNotRightCurlyBracket ~ space ~ "}" ~ space)
+     "{" ~ space ~ "\"login\"" ~ space ~ ":" ~ space ~ string ~ "," ~ 
+     untilComma.rep(sep=",",max=15) ~ space ~ untilRightCurlyBracket ~ space ~  "}" ~ space)
 
-   val extTriple: P[Js.Trip] = 
-     P( "{" ~ space ~ (total ~ weeks ~ author)/*.rep(sep=",".~/)*/ ~ space ~ "}").map {
-       Js.Trip.apply
+   val projection: P[Js.Arr] = 
+     P( space ~ "{" ~ space ~ total ~ weeks ~ author ~ space ~ "}" ~ space).map {
+       case (t,w,a) => Js.Arr(t,a)
      }
 
+   val projections: P[Js.Arr] =
+     P( "[" ~/ projection.rep(sep=",".~/) ~ "]").map(Js.Arr(_:_*))
+   
    /*val schema =
      P( "[" ~/ jsonExpr.rep(sep=",".~/) ~ space ~ "]").map(Js.Arr(_:_*))
 
