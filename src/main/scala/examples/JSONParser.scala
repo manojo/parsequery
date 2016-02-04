@@ -6,13 +6,13 @@ object HelloJSON extends JSONParser {
 
   def main(args: Array[String]) {
 
-    val Parsed.Success(value, _) = jsonExpr.parse(
-      io.Source.fromFile("data/scala-lang-contributions.json").mkString
+    val Parsed.Success(value, _) = extTriple.parse(
+      io.Source.fromFile("data/scala-lang-contributions-short.json").mkString
     )
 
-    println(value(0))
-    //assert(value(200)("friends")(1)("name").value == "Susan White")
-
+    //println(value(0))
+    println(value)
+    //assert(value(200)("friends")(1)("name").value == "Susan White") 
   }
 }
 
@@ -28,8 +28,10 @@ object Js {
     def apply(s: java.lang.String): Val =
       this.asInstanceOf[Obj].value.find(_._1 == s).get._2
   }
+  case class Unitt(value: Char) extends AnyVal with Val
   case class Str(value: java.lang.String) extends AnyVal with Val
   case class Obj(value: (java.lang.String, Val)*) extends AnyVal with Val
+  case class Trip(value: (Val, Val, Val)) extends AnyVal with Val
   case class Arr(value: Val*) extends AnyVal with Val
   case class Num(value: Double) extends AnyVal with Val
   case object False extends Val{
@@ -92,4 +94,29 @@ trait JSONParser {
    val jsonExpr: P[Js.Val] = P(
      space ~ (obj | array | string | `true` | `false` | `null` | number) ~ space
    )
+
+   //val total = P( "total" ~/ ":" ~/ jsonExpr ).map(e => Js.Str("total") -> e)
+   val total: Parser[Js.Num] = P( "\"total\"" ~ ":" ~ space ~ number ~ space ~ "," ~ space)
+
+   val notRightBracket = NamedFunction(!"]".contains(_: Char), "NotRightBracket")
+   val anyCharNotRightBracket = P( CharsWhile(notRightBracket) )
+   val notRightCurlyBracket = NamedFunction(!"}".contains(_: Char), "NotRightCurlyBracket")
+   val anyCharNotRightCurlyBracket = P( CharsWhile(notRightCurlyBracket) )
+
+   val weeks: Parser[Js.Unitt] = P( "\"weeks\"" ~ space ~ ":" ~ space ~ 
+     "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => Js.Unitt('a'))
+   val author: Parser[Js.Str] = P("\"author\"" ~ space ~ ":" ~ space ~ 
+     "{" ~ space ~ "\"login\"" ~ space ~ ":" ~ space ~ string ~ "," ~ anyCharNotRightCurlyBracket ~ space ~ "}" ~ space)
+
+   val extTriple: P[Js.Trip] = 
+     P( "{" ~ space ~ (total ~ weeks ~ author)/*.rep(sep=",".~/)*/ ~ space ~ "}").map {
+       Js.Trip.apply
+     }
+
+   /*val schema =
+     P( "[" ~/ jsonExpr.rep(sep=",".~/) ~ space ~ "]").map(Js.Arr(_:_*))
+
+   val specializedParser: P[Js.Val] = P(
+     space ~ (schema) ~ space
+   )*/
 }
