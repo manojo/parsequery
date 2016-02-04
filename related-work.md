@@ -11,3 +11,13 @@ For this, they use union types and subtyping.
 **How it relates:** ???
 
 --
+
+P. Buneman and A. Ohori. _[Polymorphism and type inference in database
+programming](http://dl.acm.org/citation.cfm?id=227609)_, ACM Transactions on DB
+Systems 1996.
+
+**Summary:**
+
+**How it relates:** ???
+
+--
