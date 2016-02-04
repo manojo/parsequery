@@ -16,8 +16,25 @@ P. Buneman and A. Ohori. _[Polymorphism and type inference in database
 programming](http://dl.acm.org/citation.cfm?id=227609)_, ACM Transactions on DB
 Systems 1996.
 
+<<<<<<< HEAD
 **Summary:**
+=======
+**Summary:** Partially dynamic records.
+>>>>>>> df01c93d3a05622a23cb0b986ae3e9c6e44872f5
 
 **How it relates:** ???
 
 --
+<<<<<<< HEAD
+=======
+
+A. Ohori and  K. Ueno. _[Making Standard ML a practical database programming
+langauge](http://www.pllab.riec.tohoku.ac.jp/papers/icfp2011OhoriUenoAuthorVersion.pdf)_,
+ICFP 2011.
+
+**Summary**: Record-based approach to integrate SQL into Standard ML?
+
+**How it relates** ???
+
+--
+>>>>>>> df01c93d3a05622a23cb0b986ae3e9c6e44872f5
