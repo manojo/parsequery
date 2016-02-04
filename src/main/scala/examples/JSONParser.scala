@@ -4,14 +4,39 @@ import fastparse.all._
 
 object HelloJSON extends JSONParser {
 
+  import Js._
+
   def main(args: Array[String]) {
 
-    val parsed = projections.parse(
-      io.Source.fromFile("data/scala-lang-contributions.json").mkString
-    )
+    val src: String = io.Source.fromFile("data/scala-lang-contributions.json").mkString
 
-    val Parsed.Success(value, _) = parsed
-    println(value)
+    /**
+     * We are interested in the (author.id, total) pairs
+     * in our contributions data.
+     * Either we parse the whole thing, and then filter data:
+     */
+    val Parsed.Success(resAll, _) = jsonExpr.parse(src)
+
+
+    val ids2totals: List[(Val, Val)] = (resAll match {
+      case x @ Arr(ls) =>
+        for(l <- ls) yield (l("author")("id"), l("total"))
+    }).toList
+
+    println(ids2totals.size)
+
+    /**
+     * Or we run a specialized parser
+     */
+    val parsed = projections.parse(src)
+
+    val Parsed.Success(specialized, _) = parsed
+    val ids2totalsBis: List[Val] = (specialized match {
+      case x @ Arr(ls) => ls
+    }).toList
+
+    println(ids2totalsBis.size)
+
   }
 }
 
@@ -27,18 +52,20 @@ object Js {
     def apply(s: java.lang.String): Val =
       this.asInstanceOf[Obj].value.find(_._1 == s).get._2
   }
+
   case class Unitt(value: Char) extends AnyVal with Val
   case class Str(value: java.lang.String) extends AnyVal with Val
-  case class Obj(value: (java.lang.String, Val)*) extends AnyVal with Val
-  case class Arr(value: Val*) extends AnyVal with Val
+  case class Obj(value: Map[java.lang.String, Val]) extends AnyVal with Val
+  case class Arr(value: Array[Val]) extends AnyVal with Val
   case class Num(value: Double) extends AnyVal with Val
-  case object False extends Val{
+
+  case object False extends Val {
     def value = false
   }
-  case object True extends Val{
+  case object True extends Val {
     def value = true
   }
-  case object Null extends Val{
+  case object Null extends Val {
     def value = null
   }
 }
@@ -82,12 +109,12 @@ trait JSONParser {
      P( space ~ "\"" ~/ (strChars | escape).rep.! ~ "\"").map(Js.Str)
 
    val array =
-     P( "[" ~/ jsonExpr.rep(sep=",".~/) ~ space ~ "]").map(Js.Arr(_:_*))
+     P( "[" ~/ jsonExpr.rep(sep=",".~/) ~ space ~ "]").map( xs => Js.Arr(xs.toArray))
 
    val pair = P( string.map(_.value) ~/ ":" ~/ jsonExpr )
 
    val obj =
-     P( "{" ~/ pair.rep(sep=",".~/) ~ space ~ "}").map(Js.Obj(_:_*))
+     P( "{" ~/ pair.rep(sep=",".~/) ~ space ~ "}").map( xs => Js.Obj(xs.toMap) )
 
    val jsonExpr: P[Js.Val] = P(
      space ~ (obj | array | string | `true` | `false` | `null` | number) ~ space
@@ -108,20 +135,20 @@ trait JSONParser {
    val stringPair = P( string ~ ":" ~ space ~ string ~ space ~ "," )
 
    val unitToken = Js.Unitt('a')
-   val weeks: Parser[Js.Unitt] = P( "\"weeks\"" ~ space ~ ":" ~ space ~ 
+   val weeks: Parser[Js.Unitt] = P( "\"weeks\"" ~ space ~ ":" ~ space ~
      "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => unitToken)
-   val author: Parser[Js.Str] = P("\"author\"" ~ space ~ ":" ~ space ~ 
-     "{" ~ space ~ "\"login\"" ~ space ~ ":" ~ space ~ string ~ "," ~ 
+   val author: Parser[Js.Str] = P("\"author\"" ~ space ~ ":" ~ space ~
+     "{" ~ space ~ "\"login\"" ~ space ~ ":" ~ space ~ string ~ "," ~
      untilComma.rep(sep=",",max=15) ~ space ~ untilRightCurlyBracket ~ space ~  "}" ~ space)
 
-   val projection: P[Js.Arr] = 
+   val projection: P[Js.Arr] =
      P( space ~ "{" ~ space ~ total ~ weeks ~ author ~ space ~ "}" ~ space).map {
-       case (t,w,a) => Js.Arr(t,a)
+       case (t,w,a) => Js.Arr(Array(t, a))
      }
 
    val projections: P[Js.Arr] =
-     P( "[" ~/ projection.rep(sep=",".~/) ~ "]").map(Js.Arr(_:_*))
-   
+     P( "[" ~/ projection.rep(sep=",".~/) ~ "]").map(xs => Js.Arr(xs.toArray))
+
    /*val schema =
      P( "[" ~/ jsonExpr.rep(sep=",".~/) ~ space ~ "]").map(Js.Arr(_:_*))
 
