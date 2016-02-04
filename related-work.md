@@ -9,3 +9,5 @@ D. Colazzo, G. Ghelli, and C. Sartiani. _[Typing massive JSON datasets](http://w
 For this, they use union types and subtyping.
 
 **How it relates:** ???
+
+--
