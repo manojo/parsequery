@@ -6,19 +6,12 @@ object HelloJSON extends JSONParser {
 
   def main(args: Array[String]) {
 
-    val parsed = projection.parse(
-      io.Source.fromFile("data/scala-lang-contributions-short.json").mkString
+    val parsed = projections.parse(
+      io.Source.fromFile("data/scala-lang-contributions.json").mkString
     )
 
     val Parsed.Success(value, _) = parsed
     println(value)
-
-    val parsed2 = projections.parse(
-      io.Source.fromFile("data/scala-lang-contributions.json").mkString
-    )
-
-    val Parsed.Success(value2, _) = parsed2
-    println(value2)
   }
 }
 
