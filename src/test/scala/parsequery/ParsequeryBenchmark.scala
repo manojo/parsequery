@@ -3,19 +3,19 @@ package parsequery
 import org.scalameter.api._
 import org.scalameter.picklers.Implicits._
 
-object ParsequeryBenchmark extends Bench.LocalTime
+object ParsequeryBenchmark extends Bench.ForkedTime
                               with JSONParser {
   import Js._
   import fastparse.all._
 
-  /*override def executor = SeparateJvmsExecutor(
+  override def executor = SeparateJvmsExecutor(
     new Executor.Warmer.Default,
     Aggregator.min[Double],
     new Measurer.Default
-  )*/
+  )
 
-  //override def persistor = Persistor.None
-  //override def reporter = new LoggingReporter
+  override def persistor = Persistor.None
+  override def reporter = new LoggingReporter
 
   def benchmark(fname: String, f: String => _) {
     import scala.io.Source
@@ -49,7 +49,6 @@ object ParsequeryBenchmark extends Bench.LocalTime
         for(l <- ls) yield (l("author")("id"), l("total"))
       case _ => sys.error("Something went wrong")
     }).toList
-    println(ids2totals.size)
   }
 
   def runSpecializedParser(src: String) = {
@@ -57,7 +56,6 @@ object ParsequeryBenchmark extends Bench.LocalTime
     val ids2totalsBis: List[Val] = (specialized match {
       case x @ Arr(ls) => ls
     }).toList
-    println(ids2totalsBis.size)
   }
 
   benchmark("GeneralParser", runGeneralParser)
