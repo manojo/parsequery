@@ -1,4 +1,4 @@
-package examples
+package parsequery
 
 import fastparse.all._
 
@@ -16,11 +16,10 @@ object HelloJSON extends JSONParser {
      * Either we parse the whole thing, and then filter data:
      */
     val Parsed.Success(resAll, _) = jsonExpr.parse(src)
-
-
     val ids2totals: List[(Val, Val)] = (resAll match {
       case x @ Arr(ls) =>
         for(l <- ls) yield (l("author")("id"), l("total"))
+      case _ => sys.error("Something went wrong")
     }).toList
 
     println(ids2totals.size)
@@ -120,7 +119,8 @@ trait JSONParser {
      space ~ (obj | array | string | `true` | `false` | `null` | number) ~ space
    )
 
-   //val total = P( "total" ~/ ":" ~/ jsonExpr ).map(e => Js.Str("total") -> e)
+   /* Define a specialized parser that suits exactly the format of the parsed dataset */
+
    val total: Parser[Js.Num] = P( "\"total\"" ~ ":" ~ space ~ number ~ space ~ "," ~ space)
 
    val notRightBracket = NamedFunction(!"]".contains(_: Char), "NotRightBracket")
@@ -148,11 +148,4 @@ trait JSONParser {
 
    val projections: P[Js.Arr] =
      P( "[" ~/ projection.rep(sep=",".~/) ~ "]").map(xs => Js.Arr(xs.toArray))
-
-   /*val schema =
-     P( "[" ~/ jsonExpr.rep(sep=",".~/) ~ space ~ "]").map(Js.Arr(_:_*))
-
-   val specializedParser: P[Js.Val] = P(
-     space ~ (schema) ~ space
-   )*/
 }
