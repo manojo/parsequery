@@ -12,7 +12,8 @@ scalacOptions ++= Seq(
   "-deprecation",
   "-feature",
   "-language:higherKinds",
-  "-language:implicitConversions"
+  "-language:implicitConversions",
+  "-unchecked"
 )
 
 defaultScalariformSettings
