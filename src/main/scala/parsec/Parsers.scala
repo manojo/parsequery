@@ -25,17 +25,15 @@ trait Parsers {
     /**
      * The flatMap operation
      */
-    def flatMap[U](f: T => Parser[U]) = Parser[U] { input =>
-      this(input) flatMapWithNext { res => rdr => f(res)(rdr) }
-    }
+    def flatMap[U](f: T => Parser[U]): Parser[U] = FlatMapped(this, f)
 
     def >>[U](f: T => Parser[U]) = flatMap(f)
 
     /**
      * The concat operation
      */
-    def ~[U](that: => Parser[U]): Parser[(T, U)] =
-      for (l <- this; r <- that) yield (l, r)
+    def ~[U](that: => Parser[U]): Parser[(T, U)] = Seq(this, that)
+
 
     /**
      * get right hand side result
@@ -52,17 +50,13 @@ trait Parsers {
     /**
      * The map operation
      */
-    def map[U](f: T => U) = Parser[U] { input =>
-      this(input) map f
-    }
+    def map[U](f: T => U): Parser[U] = Mapped(this, f)
 
     /**
      * alternation, aka the beast
      * Note: actually, it's not much of a beast nomore!
      */
-    def | [U >: T](that: => Parser[U]) = Parser[U] { input =>
-      this(input) orElse that(input)
-    }
+    def | [U >: T](that: => Parser[U]): Parser[U] = Or(this, that)
 
   }
 
@@ -104,6 +98,31 @@ trait Parsers {
       }
 
     loop(in, ListBuffer.empty) map (_.toList)
+  }
+
+
+  /**
+   * An ADT for parsers
+   */
+  case class FlatMapped[T, U](p: Parser[T], f: T => Parser[U]) extends Parser[U] {
+    def apply(in: Input) =  p(in) flatMapWithNext { res => rdr => f(res)(rdr) }
+  }
+
+  case class Mapped[T, U](p: Parser[T], f: T => U) extends Parser[U] {
+    def apply(in: Input) = p(in) map f
+  }
+
+  case class Seq[T, U](l: Parser[T], r: Parser[U]) extends Parser[(T, U)] {
+
+    /**
+     * we just use the composition on parsers directly
+     */
+    val inner = for (lRes <- l; rRes <- r) yield (lRes, rRes)
+    def apply(in: Input) = inner(in)
+  }
+
+  case class Or[T](l: Parser[T], r: Parser[T]) extends Parser[T] {
+    def apply(in: Input) = l(in) orElse r(in)
   }
 
 
