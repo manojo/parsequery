@@ -17,7 +17,7 @@ trait CharParsers extends Parsers {
 /**
  * Testing out how the parsers work y'all!
  */
-object HelloCharParsers extends CharParsers {
+object HelloCharParsers extends CharParsers with RepetitionParsers {
 
   /**
    * Let's create a reducer for lists
@@ -38,3 +38,4 @@ object HelloCharParsers extends CharParsers {
 
   }
 }
+
