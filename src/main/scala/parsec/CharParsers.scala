@@ -3,7 +3,7 @@ package parsec
 /**
  * A trait for parsing characters
  */
-trait CharParsers extends Parsers {
+trait CharParsers extends Parsers with RepetitionParsers {
 
   type Elem = Char
 
@@ -11,31 +11,8 @@ trait CharParsers extends Parsers {
    * some other handy parsers
    */
   def letter: Parser[Char] = acceptIf(_.isLetter)
+  def digit: Parser[Char] = acceptIf(_.isDigit)
+  def word[R](implicit red: Reducer[Char, R]) = rep(letter)
+  //def number[R](implicit red: Reducer[Char, R]) = rep(digit) map (_.toInt)
 
 }
-
-/**
- * Testing out how the parsers work y'all!
- */
-object HelloCharParsers extends CharParsers with RepetitionParsers {
-
-  /**
-   * Let's create a reducer for lists
-   */
-  implicit val listReducer: Reducer[Char, List[Char]] =
-    Reducer(List[Char](), (ls, a) => ls :+ a)
-
-  def main(args: Array[String]) {
-
-    val input = "oh hai!"
-    val aParser = accept('o') ~ accept('h')
-
-    val anotherParser: Parser[List[Char]] = rep(letter)
-
-    println("Hello, Parsers!")
-    println(aParser(CharReader(input.toArray)))
-    println(anotherParser(CharReader(input.toArray)))
-
-  }
-}
-

@@ -3,8 +3,10 @@ package parsequery
 import org.scalameter.api._
 import org.scalameter.picklers.Implicits._
 
-object ParsequeryBenchmark extends Bench.ForkedTime
-                              with JSONParser {
+object ParsequeryBenchmark
+    extends Bench.ForkedTime
+    with JSONParser {
+
   import Js._
   import fastparse.all._
 
@@ -33,7 +35,7 @@ object ParsequeryBenchmark extends Bench.ForkedTime
         using(range) in { n =>
           // we use while to remove overhead of for ... yield
           var i=0
-          while (i < n) { 
+          while (i < n) {
             f(fileContent)
             i+=1
           }
@@ -58,6 +60,6 @@ object ParsequeryBenchmark extends Bench.ForkedTime
     }).toList
   }
 
-  benchmark("GeneralParser", runGeneralParser)
-  benchmark("SpecializedParser", runSpecializedParser)
+  //benchmark("GeneralParser", runGeneralParser)
+  //benchmark("SpecializedParser", runSpecializedParser)
 }
