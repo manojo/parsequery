@@ -3,11 +3,6 @@ package parsec
 import scala.annotation.tailrec
 
 /**
- * A simple Reducer for now
- */
- case class Reducer[A, R](z: R, combine: (R, A) => R)
-
-/**
  * Something potentially beautiful:
  *
  * Consider the usual `rep` function on parsers:
@@ -39,50 +34,34 @@ import scala.annotation.tailrec
  * https://github.com/manojo/staged-fold-fusion/blob/master/src/main/scala/barbedwire/CPSList.scala
  *
  * the type signature of foldLeft is
- *    def foldLeft[A, B](z: B, comb: (B, A) => A)(xs: List[A]) : B
+ *    def foldLeft[T, R](z: R, comb: (R, T) => T)(xs: List[T]) : R
  *
  */
 
 trait RepetitionParsers extends Parsers {
 
-  def rep[T, R](p: Parser[T])(implicit red: Reducer[T, R]): Parser[R]
-    = Repeat(new CPSListParser[T, R](p))
+  /**
+   * a type alias for the combination function for
+   * foldLeft
+   * `T` is the type of elements that pass through the fold
+   * `R` is the type that is eventually computed
+   */
+  type Combine[T, R] = (R, T) => R
+
+  def rep[T](p: Parser[T]) = fromParser(p)
 
   /**
    * the repetition parser yields a `R` which is the result type
-   * of a `CPSListParser`.
+   * of a `FoldParser`.
    *
-   * We need to have a CPSList hanging around, as well as knowledge that
-   * we can reduce it, which we take as an implicit
-   * @TODO implicits so early seems like an overkill, will need to thinK
-   * this through better.
-   *
-   * Design of `Reducer` inspired by fastparse, cf. `Repeater`
-   * https://github.com/lihaoyi/fastparse/blob/master/fastparse/shared/src/main/scala/fastparse/ParserApi.scala
+   * We need to have a CPSList hanging around
    */
-  case class Repeat[T, R](p: CPSListParser[T, R])(implicit red: Reducer[T, R]) extends Parser[R] {
-    def apply(in: Input) = p.fold(red.z, red.combine)(in)
-  }
 
   /**
-   * all functions on cpslists will have the F prefix (for fold)
-   *
-   * @TODO It would be nice to not have `R` popping out in the parameters here.
-   * So that we only need specify the type at the very end.
-   * an alternate design is to have `fold` carry it:
-   * def fold[R](z: R, comb: Combine[A, R]): R
+   * create a FoldParser given a parser
    */
-  class CPSListParser[A, R](parser: Parser[A]) { self =>
-
-    /**
-     * a type alias for the combination function for
-     * foldLeft
-     * `A` is the type of elements that pass through the fold
-     * `S` is the type that is eventually computed
-     */
-    type Combine[A, S] = (S, A) => S
-
-    def fold(z: R, combine: Combine[A, R]): Parser[R] = Parser { in =>
+  def fromParser[T](parser: Parser[T]): FoldParser[T] = new FoldParser[T] {
+    def fold[R](z: R, combine: Combine[T, R]): Parser[R] = Parser { in =>
 
       @tailrec
       def loop(curIn: Input, curRes: R): ParseResult[R] = parser(curIn) match {
@@ -96,35 +75,52 @@ trait RepetitionParsers extends Parsers {
 
       loop(in, z)
     }
+  }
+
+  /**
+   * all functions on cpslists will have the F prefix (for fold)
+   *
+   * @TODO It would be nice to not have `R` popping out in the parameters here.
+   * So that we only need specify the type at the very end.
+   * an alternate design is to have `fold` carry it:
+   * def fold[R](z: R, comb: Combine[T, R]): R
+   */
+  abstract class FoldParser[T] { self =>
+
+    def fold[R](z: R, combine: Combine[T, R]): Parser[R]
 
     /**
      * mapF. Pretty nice, cause we can forward the map
      * function over to the underlying parser, it's exactly
      * the same!
      */
-    def mapF[B](f: A => B) = new CPSListParser[B, R](parser map f)
+    def mapF[U](f: T => U) = new FoldParser[U] {
+      def fold[R](z: R, combine: Combine[U, R]): Parser[R] = self.fold(
+        z,
+        (acc: R, elem: T) => combine(acc, f(elem))
+      )
+    }
 
     /**
      * filter
      */
-    def filterF(p: A => Boolean) = new CPSListParser[A, R](parser) {
+    def filterF(p: T => Boolean) = new FoldParser[T] {
 
-      override def fold(z: R, comb: Combine[A, R]) = self.fold(
+      override def fold[R](z: R, comb: Combine[T, R]) = self.fold(
         z,
-        (acc: R, elem: A) => if (p(elem)) comb(acc, elem) else acc
+        (acc: R, elem: T) => if (p(elem)) comb(acc, elem) else acc
       )
     }
-
 
     /**
      * flatMap. It is unclear what semantics this should have for now
      * let's implement it later
      */
-    /*def flatMapF[B](f: A => CPSList[B, R]) = new CPSListParser[B, R] {
+    /*def flatMapF[U](f: T => CPSList[U, R]) = new FoldParser[U, R] {
 
-      def fold(z: R, comb: Combine[B, R]) = self.fold(
+      def fold(z: R, comb: Combine[U, R]) = self.fold(
         z,
-        (acc: R, elem: A) => {
+        (acc: R, elem: T) => {
           val nestedList = f(elem)
           nestedList.fold(acc, comb)
         }
@@ -138,7 +134,7 @@ trait RepetitionParsers extends Parsers {
      *
      * see the following related post: http://manojo.github.io/2015/03/03/staged-foldleft-partition/
      */
-    def partition(p: A => Boolean): (CPSListParser[A, R], CPSListParser[A, R]) = {
+    def partition(p: T => Boolean): (FoldParser[T], FoldParser[T]) = {
       val trues = this filterF p
       val falses = this filterF (a => !p(a))
       (trues, falses)
@@ -151,7 +147,7 @@ trait RepetitionParsers extends Parsers {
      * This can be rewritten using `map`.
      * see the following related post: http://manojo.github.io/2015/03/12/staged-foldleft-groupby/
      */
-    def partitionBis(p: A => Boolean) =
+    def partitionBis(p: T => Boolean) =
       this mapF (elem => if (p(elem)) Left(elem) else Right(elem))
 
     /**
@@ -162,8 +158,50 @@ trait RepetitionParsers extends Parsers {
      * can be rewritten using `map`.
      * see the following related post: http://manojo.github.io/2015/03/12/staged-foldleft-groupby/
      */
-    def groupWith[K](f: A => K): CPSListParser[(K, A), R] =
+    def groupWith[K](f: T => K): FoldParser[(K, T)] =
       this mapF (elem => (f(elem), elem))
 
+    /**
+     * We can now concatenate a parser!
+     */
+    def ~[U](that: Parser[U]): FoldConcatParser[T, U] = new FoldConcatParser[T, U] {
+      def fold[R](z: R, combine: Combine[T, R]): Parser[(R, U)] =
+        self.fold(z, combine) ~ that
+    }
   }
+
+  /**
+   * We need to be able to compose rep(a) ~ b in a way such that we can provide the fold function
+   * after the b. This needs to extend to any amount of concatenations. Should be do-able
+   * with this one extra class
+   */
+  abstract class FoldConcatParser[T, U] { self =>
+
+    /**
+     * the fold function still only holds for the first parser,
+     * i.e. we only fold over `T`
+     */
+    def fold[R](z: R, combine: Combine[T, R]): Parser[(R, U)]
+
+    /**
+     * Concatenation must become right associative now, because we don't
+     * want a `FoldConcatParser[((T, U), U2)]
+     */
+    def ~[U2](that: Parser[U2]): FoldConcatParser[T, (U, U2)] = new FoldConcatParser[T, (U, U2)] {
+      def fold[R](z: R, combine: Combine[T, R]): Parser[(R, (U, U2))] =
+        (self.fold(z, combine) ~ that) map { case ((r, u), u2) => (r, (u, u2)) }
+    }
+
+  }
+
+
+  /**
+   * some handy folders
+   */
+  def listFolder[T] = (List[T](), (acc: List[T], t: T) => acc :+ t)
+  def lengthFolder[T] = (0, (acc: Int, t: T) => acc + 1)
+
+  import scala.collection.mutable.ArrayBuffer
+  def arrayBufFolder[T] = (ArrayBuffer.empty[T], (acc: ArrayBuffer[T], t: T) => acc :+ t)
+
 }

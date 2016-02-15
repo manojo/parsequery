@@ -9,25 +9,10 @@ class CharParsersSuite
     extends FunSuite
     with CharParsers {
 
-
-  /**
-   * Let's create a reducer for lists
-   */
-  implicit val listReducer: Reducer[Char, List[Char]] =
-    Reducer(List[Char](), (ls, a) => ls :+ a)
-
-  val myReader = CharReader("oh hai!".toArray)
-
-  val twoCharParser = accept('o') ~ accept('h')
-
-  /**
-    * precising the return type forces the implicit search
-    * to kick in for finding the `Reducer`
-    */
-  val wordParser: Parser[List[Char]] = word
-
+  val myReader = CharReader("oh3hiagain!".toArray)
 
   test("can parse two chars") {
+    val twoCharParser = accept('o') ~ accept('h')
     twoCharParser(myReader) match {
       case Success(res, rest) => rest match {
         case CharReader(_, pos) => assert(res == ('o', 'h') && pos == 2)
@@ -39,9 +24,30 @@ class CharParsersSuite
   }
 
   test("can parse a word") {
+    val (strZ, strCombine) = stringFolder
+    def wordParser: Parser[String] = letters.fold(strZ, strCombine).map(_.toString)
+
     wordParser(myReader) match {
       case Success(res, rest) => rest match {
-        case CharReader(_, pos) => assert(res == List('o', 'h') && pos == 2)
+        case CharReader(_, pos) => assert(res == "oh" && pos == 2)
+        case _ => assert(false)
+      }
+      case _ => assert(false)
+    }
+  }
+
+  test("can parse a word and a letter") {
+    val (strZ, strCombine) = stringFolder
+
+    def wordDigitLetter: Parser[(String, (Char, Char))]
+      = (letters ~ digit ~ letter).fold(strZ, strCombine) map {
+          case (ls, other) => (ls.toString, other)
+        }
+
+    wordDigitLetter(myReader) match {
+      case Success(res, rest) => rest match {
+        case CharReader(_, pos) =>
+          assert(res == ("oh", ('3', 'h')) && pos == 4)
         case _ => assert(false)
       }
       case _ => assert(false)
