@@ -32,7 +32,6 @@ trait Parsers {
      */
     def ~[U](that: => Parser[U]): Parser[(T, U)] = Seq(this, that)
 
-
     /**
      * get right hand side result
      */
@@ -54,7 +53,7 @@ trait Parsers {
      * alternation, aka the beast
      * Note: actually, it's not much of a beast nomore!
      */
-    def | [U >: T](that: => Parser[U]): Parser[U] = Or(this, that)
+    def |[U >: T](that: => Parser[U]): Parser[U] = Or(this, that)
 
   }
 
@@ -82,7 +81,7 @@ trait Parsers {
    * An ADT for parsers
    */
   case class FlatMapped[T, U](p: Parser[T], f: T => Parser[U]) extends Parser[U] {
-    def apply(in: Input) =  p(in) flatMapWithNext { res => rdr => f(res)(rdr) }
+    def apply(in: Input) = p(in) flatMapWithNext { res => rdr => f(res)(rdr) }
   }
 
   case class Mapped[T, U](p: Parser[T], f: T => U) extends Parser[U] {

@@ -29,10 +29,9 @@ object HelloCharParsers extends CharParsers {
 
   val (strZ, strCombine) = stringFolder
 
-  val wordDigitLetter: Parser[(String, Char)]
-    = (letters ~ digit).fold(strZ, strCombine) map {
-      case (ls, other) => (ls.toString, other)
-    }
+  val wordDigitLetter: Parser[(String, Char)] = (letters ~ digit).fold(strZ, strCombine) map {
+    case (ls, other) => (ls.toString, other)
+  }
 
   def main(args: Array[String]) {
     val myReader = CharReader("oh3hiagain!".toArray)
