@@ -168,6 +168,14 @@ trait RepetitionParsers extends Parsers {
       def fold[R](z: R, combine: Combine[T, R]): Parser[(R, U)] =
         self.fold(z, combine) ~ that
     }
+
+    /**
+     * we can concatenate another rep parser too!
+     */
+    def ~[U](that: FoldParser[U]) = new FoldFoldParser[T, U] {
+      def fold[R1, R2](f1: FoldFunction[T, R1], f2: FoldFunction[U, R2]): Parser[(R1, R2)] =
+        self.fold[R1](f1._1, f1._2) ~ that.fold[R2](f2._1, f2._2)
+    }
   }
 
   /**
@@ -191,7 +199,25 @@ trait RepetitionParsers extends Parsers {
       def fold[R](z: R, combine: Combine[T, R]): Parser[(R, (U, U2))] =
         (self.fold(z, combine) ~ that) map { case ((r, u), u2) => (r, (u, u2)) }
     }
+  }
 
+  /**
+   * We need to be able to compose rep(a) ~ rep(b) as well.
+   */
+  abstract class FoldFoldParser[T, U] { self =>
+
+    type FoldFunction[A, R] = (R, Combine[A, R])
+
+    /**
+     * there are two fold functions now passed
+     */
+    def fold[R1, R2](f1: FoldFunction[T, R1], f2: FoldFunction[U, R2]): Parser[(R1, R2)]
+
+    /**
+     * a concat on a FFP does not give back an FFP!
+     * We need an FFCP, and this rabbit hole goes far one level more!
+     */
+    //def ~[U2](p: Parser[U2]): FoldFoldParser[T, U]
   }
 
   /**

@@ -71,4 +71,23 @@ class CharParsersSuite
       case _ => assert(false)
     }
   }
+
+  test("can parse a word, then some letters") {
+
+    val wordsdigits: Parser[(String, String)] = {
+      (letters ~ digits).fold(stringFolder, stringFolder) map {
+        case (ls, ds) => (ls.toString, ds.toString)
+      }
+    }
+
+    wordsdigits(CharReader("hithere12345!".toArray)) match {
+      case Success(res, rest) => rest match {
+        case CharReader(_, pos) =>
+          assert(res == ("hithere", "12345") && pos == 12)
+        case _ => assert(false)
+      }
+      case _ => assert(false)
+    }
+
+  }
 }
