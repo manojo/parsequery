@@ -22,7 +22,7 @@ trait CharParsers extends Parsers with RepetitionParsers {
     rep(digit2Int).fold[Int](0, (acc, n) => acc * 10 + n)
 
   def ws = rep(singleSpace)
-  def ignoreWs = ws.fold[Unit]((), (acc, _) => acc)
+  def ignoreWs = ws.toSkipper
 
   /**
    * surrounds any parser with a whitespace ignoring parser
@@ -30,30 +30,5 @@ trait CharParsers extends Parsers with RepetitionParsers {
    */
   def skipWs[T](p: Parser[T]): Parser[T] =
     ignoreWs ~> p <~ ignoreWs
-
-  /**
-   * some handy reducers
-   */
-  import scala.collection.mutable.StringBuilder
-  def stringFolder = (
-    StringBuilder.newBuilder,
-    (acc: StringBuilder, c: Char) => acc append c
-  )
-}
-
-object HelloCharParsers extends CharParsers {
-
-  val (strZ, strCombine) = stringFolder
-
-  val wordDigitLetter: Parser[(String, Char)] = {
-    (letters ~ digit).fold(strZ, strCombine) map {
-      case (ls, other) => (ls.toString, other)
-    }
-  }
-
-  def main(args: Array[String]): Unit = {
-    val myReader = CharReader("oh3hiagain!".toArray)
-    println(wordDigitLetter(myReader))
-  }
 
 }

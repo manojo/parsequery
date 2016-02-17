@@ -50,16 +50,12 @@ class HListParserSuite
      * This is a bit ugly cause we see the `FoldParser` type
      * could we use some mad skills to give a better type?
      */
-    def justTheStringPlease(fp: FoldParser[Char]): Parser[String] = {
-      val (strZ, strCombine) = stringFolder
-      fp.fold(strZ, strCombine).map(_.toString)
-    }
+    def justTheStringPlease(fp: FoldParser[Char]): Parser[String] =
+      fp.toStringParser
 
     def addtheInts(fp: FoldParser[Int]) = fp.fold[Int](0, (acc, x) => acc + x)
-    def upperCaseTheVowels(fp: FoldParser[Char]) = {
-      val (strZ, strCombine) = stringFolder
-      (fp filter isVowel map (_.toUpper)).fold(strZ, strCombine).map(_.toString)
-    }
+    def upperCaseTheVowels(fp: FoldParser[Char]) =
+      (fp filter isVowel map (_.toUpper)).toStringParser
 
     /**
      * could we also possibly have a better syntax here?
@@ -87,16 +83,8 @@ class HListParserSuite
      * Has to be a def since we need to always have a new
      * stringbuilder
      */
-    def first = letters.fold(
-      StringBuilder.newBuilder,
-      (acc: StringBuilder, c: Char) => acc append c
-    ).map(_.toString)
-
-    def last = letters.fold(
-      StringBuilder.newBuilder,
-      (acc: StringBuilder, c: Char) => acc append c
-    ).map(_.toString)
-
+    def first = letters.toStringParser
+    def last = letters.toStringParser
     def age = number
 
     val comma = accept(',')
@@ -109,12 +97,11 @@ class HListParserSuite
     )
 
     def peopleParser = rep(personRecord)
-    def adultsParser = peopleParser filter { case f :: l :: a :: HNil => a >= 18 }
+    def adultsParser = peopleParser filter {
+      case f :: l :: a :: HNil => a >= 18
+    }
 
-    def adultList = adultsParser.fold(
-      List[Person](),
-      (acc: List[Person], p: Person) => acc :+ p
-    )
+    def adultList = adultsParser.toList
 
     val people = List(
       "Roger, Federer, 34",

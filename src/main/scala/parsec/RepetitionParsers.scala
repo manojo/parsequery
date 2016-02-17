@@ -110,7 +110,7 @@ trait RepetitionParsers extends Parsers {
      * flatMap. It is unclear what semantics this should have for now
      * let's implement it later
      */
-    /*def flatMapF[U](f: T => CPSList[U, R]) = new FoldParser[U, R] {
+    /*def flatMap[U](f: T => CPSList[U, R]) = new FoldParser[U, R] {
 
       def fold(z: R, comb: Combine[U, R]) = self.fold(
         z,
@@ -170,6 +170,21 @@ trait RepetitionParsers extends Parsers {
       def fold[R1, R2](f1: FoldFunction[T, R1], f2: FoldFunction[U, R2]): Parser[(R1, R2)] =
         self.fold[R1](f1._1, f1._2) ~ that.fold[R2](f2._1, f2._2)
     }
+
+    /**
+     * utility functions that make it easier to write fold-like functions
+     */
+    def toList: Parser[List[T]] = {
+      import scala.collection.mutable.ListBuffer
+      self.fold[ListBuffer[T]](
+        ListBuffer.empty[T],
+        (acc: ListBuffer[T], t: T) => acc :+ t
+      ).map(_.toList)
+    }
+
+    def toSkipper: Parser[Unit] = self.fold((), (acc: Unit, _) => acc)
+    def toLength: Parser[Int] = self.fold(0, (acc: Int, _) => acc + 1)
+
   }
 
   /**
@@ -214,17 +229,17 @@ trait RepetitionParsers extends Parsers {
   }
 
   /**
-   * some handy folders
+   * ops on folding chars
    */
-  def listFolder[T] = (List[T](), (acc: List[T], t: T) => acc :+ t)
-  def lengthFolder[T] = (0, (acc: Int, t: T) => acc + 1)
+  implicit class CharFoldOps(cFold: FoldParser[Char]) {
 
-  import scala.collection.mutable.ArrayBuffer
-  def arrayBufFolder[T] = (
-    ArrayBuffer.empty[T],
-    (acc: ArrayBuffer[T], t: T) => acc :+ t
-  )
-
-  def unitFolder[T] = ((), (acc: Unit, t: T) => acc)
+    def toStringParser: Parser[String] = {
+      import scala.collection.mutable.StringBuilder
+      cFold.fold[StringBuilder](
+        StringBuilder.newBuilder,
+        (acc: StringBuilder, c: Char) => acc append c
+      ).map(_.toString)
+    }
+  }
 
 }

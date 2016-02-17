@@ -11,6 +11,12 @@ class CharParsersSuite
 
   val myReader = CharReader("oh3hiagain!".toArray)
 
+  import scala.collection.mutable.StringBuilder
+  def stringFolder = (
+    StringBuilder.newBuilder,
+    (acc: StringBuilder, c: Char) => acc append c
+  )
+
   test("can parse two chars") {
     val twoCharParser = accept('o') ~ accept('h')
     checkSuccess(twoCharParser, myReader)(
@@ -20,11 +26,7 @@ class CharParsersSuite
   }
 
   test("can parse a word") {
-    val (strZ, strCombine) = stringFolder
-
-    val wordParser: Parser[String] =
-      letters.fold(strZ, strCombine).map(_.toString)
-
+    val wordParser: Parser[String] = letters.toStringParser
     checkSuccess(wordParser, myReader)(expected = "oh", expectedPos = 2)
   }
 
