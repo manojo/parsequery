@@ -1,3 +1,5 @@
+package shapeless
+
 import scala.tools.nsc._
 
 import org.scalameter.api._

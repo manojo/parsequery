@@ -1,9 +1,11 @@
+package shapeless
+
 import shapeless._
 import poly._
 
 /**
- * This source code is compiled by an embedded to check
- * the compilation time of HList for extreme cases.
+ * This source code is compiled by an embedded compiler to 
+ * check the compilation time of HList for extreme cases.
  *
  * Currently, there is only a dummy test that should be
  * replaced for more concrete and extensive examples of
