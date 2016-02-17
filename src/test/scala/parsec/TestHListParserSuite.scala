@@ -1,13 +1,13 @@
 package parsec
 
-import org.scalatest.FunSuite
+import util.ParserFunSuite
 
 /**
  * Testing HListParsers
  * The idea is that each parser lives as a separate tuple
  */
 class HListParserSuite
-    extends FunSuite
+    extends ParserFunSuite
     with HListParsers
     with CharParsers {
 
@@ -18,16 +18,9 @@ class HListParserSuite
 
   test("parsing a single element gives a single result") {
     val pList = letter :: HNil
-
     val res: ParseResult[Char :: HNil] = parse(pList, myReader)
 
-    res match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) => assert(res.head == 'o' && pos == 1)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
+    checkSuccessH(res)(expected = 'o' :: HNil, expectedPos = 1)
   }
 
   test("parsing four elements works too") {
@@ -36,14 +29,10 @@ class HListParserSuite
     val res: ParseResult[Char :: Char :: Char :: Char :: HNil]
       = parse(pList, myReader)
 
-    res match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) =>
-          assert(res == 'o' :: 'h' :: '3' ::'h' :: HNil && pos == 4)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
+    checkSuccessH(res)(
+      expected = 'o' :: 'h' :: '3' ::'h' :: HNil, expectedPos = 4
+    )
+
   }
 
   import util.Mappable._
@@ -82,17 +71,12 @@ class HListParserSuite
     val mapped = map(repConcats, functions)
     val myInput = CharReader("oh12345idris!".toArray)
 
-    val res: ParseResult[String :: Int :: String :: HNil] = parse(mapped, myInput)
+    val res: ParseResult[String :: Int :: String :: HNil] =
+      parse(mapped, myInput)
 
-    res match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) =>
-          assert(res == "oh" :: 15 :: "II" :: HNil && pos == 12)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
-
+    checkSuccessH(res)(
+      expected =  "oh" :: 15 :: "II" :: HNil, expectedPos = 12
+    )
   }
 
 }

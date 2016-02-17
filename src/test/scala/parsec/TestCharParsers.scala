@@ -1,26 +1,22 @@
 package parsec
 
-import org.scalatest.FunSuite
+import util.ParserFunSuite
 
 /**
  * Testing CharParsers
  */
 class CharParsersSuite
-    extends FunSuite
+    extends ParserFunSuite
     with CharParsers {
 
   val myReader = CharReader("oh3hiagain!".toArray)
 
   test("can parse two chars") {
     val twoCharParser = accept('o') ~ accept('h')
-    twoCharParser(myReader) match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) => assert(res == (('o', 'h')) && pos == 2)
-        case _ => assert(false)
-      }
-
-      case _ => assert(false)
-    }
+    checkSuccess(twoCharParser, myReader)(
+      expected = ('o', 'h'),
+      expectedPos = 2
+    )
   }
 
   test("can parse a word") {
@@ -29,13 +25,7 @@ class CharParsersSuite
     val wordParser: Parser[String] =
       letters.fold(strZ, strCombine).map(_.toString)
 
-    wordParser(myReader) match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) => assert(res == "oh" && pos == 2)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
+    checkSuccess(wordParser, myReader)(expected = "oh", expectedPos = 2)
   }
 
   test("can parse a word, a digit, and another letter") {
@@ -47,14 +37,9 @@ class CharParsersSuite
       }
     }
 
-    wordDigitLetter(myReader) match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) =>
-          assert(res == (("oh", ('3', 'h'))) && pos == 4)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
+    checkSuccess(wordDigitLetter, myReader)(
+      expected = ("oh", ('3', 'h')), expectedPos = 4
+    )
   }
 
   test("can parse a digit, then a word") {
@@ -65,14 +50,9 @@ class CharParsersSuite
         case (other, ls) => (other, ls.toString)
       }
 
-    digitword(CharReader("3hiagain!".toArray)) match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) =>
-          assert(res == (('3', "hiagain")) && pos == 8)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
+    checkSuccess(digitword, CharReader("3hiagain!".toArray))(
+      expected = ('3', "hiagain"), expectedPos = 8
+    )
   }
 
   test("can parse a word, then some letters") {
@@ -83,14 +63,9 @@ class CharParsersSuite
       }
     }
 
-    wordsdigits(CharReader("hithere12345!".toArray)) match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) =>
-          assert(res == (("hithere", "12345")) && pos == 12)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
+    checkSuccess(wordsdigits, CharReader("hithere12345!".toArray))(
+      expected = ("hithere", "12345"), expectedPos = 12
+    )
   }
 
   test("number parser works as expected") {
@@ -98,23 +73,8 @@ class CharParsersSuite
     val zero = CharReader("".toArray)
     val biggerNum = CharReader("12345".toArray)
 
-    number(zero) match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) =>
-          assert(res == 0 && pos == 0)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
-
-    number(biggerNum) match {
-      case Success(res, rest) => rest match {
-        case CharReader(_, pos) =>
-          assert(res == 12345 && pos == 5)
-        case _ => assert(false)
-      }
-      case _ => assert(false)
-    }
+    checkSuccess(number, zero)(expected = 0, expectedPos = 0)
+    checkSuccess(number, biggerNum)(expected = 12345, expectedPos = 5)
   }
 
 }
