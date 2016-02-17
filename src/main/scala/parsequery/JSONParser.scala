@@ -6,7 +6,7 @@ object HelloJSON extends JSONParser {
 
   import Js._
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
 
     val src: String = io.Source.fromFile("data/scala-lang-contributions.json").mkString
 
@@ -18,7 +18,7 @@ object HelloJSON extends JSONParser {
     val Parsed.Success(resAll, _) = jsonExpr.parse(src)
     val ids2totals: List[(Val, Val)] = (resAll match {
       case x @ Arr(ls) =>
-        for(l <- ls) yield (l("author")("id"), l("total"))
+        for (l <- ls) yield (l("author")("id"), l("total"))
       case _ => sys.error("Something went wrong")
     }).toList
 
@@ -52,20 +52,19 @@ object Js {
       this.asInstanceOf[Obj].value.find(_._1 == s).get._2
   }
 
-  case class Unitt(value: Char) extends AnyVal with Val
   case class Str(value: java.lang.String) extends AnyVal with Val
   case class Obj(value: Map[java.lang.String, Val]) extends AnyVal with Val
   case class Arr(value: Array[Val]) extends AnyVal with Val
   case class Num(value: Double) extends AnyVal with Val
 
   case object False extends Val {
-    def value = false
+    def value: Boolean = false
   }
   case object True extends Val {
-    def value = true
+    def value: Boolean = true
   }
   case object Null extends Val {
-    def value = null
+    def value: Val = null
   }
 }
 
@@ -75,77 +74,80 @@ object Js {
  */
 trait JSONParser {
 
-   case class NamedFunction[T, V](f: T => V, name: String) extends (T => V){
-     def apply(t: T) = f(t)
-     override def toString() = name
+  case class NamedFunction[T, V](f: T => V, name: String) extends (T => V) {
+    def apply(t: T): V = f(t)
+    override def toString(): String = name
+  }
 
-   }
-   // Here is the parser
-   val Whitespace = NamedFunction(" \r\n".contains(_: Char), "Whitespace")
-   val Digits = NamedFunction('0' to '9' contains (_: Char), "Digits")
-   val StringChars = NamedFunction(!"\"\\".contains(_: Char), "StringChars")
+  // Here is the parser
+  val Whitespace = NamedFunction(" \r\n".contains(_: Char), "Whitespace")
+  val Digits = NamedFunction('0' to '9' contains (_: Char), "Digits")
+  val StringChars = NamedFunction(!"\"\\".contains(_: Char), "StringChars")
 
-   val space         = P( CharsWhile(Whitespace).? )
-   val digits        = P( CharsWhile(Digits))
-   val exponent      = P( CharIn("eE") ~ CharIn("+-").? ~ digits )
-   val fractional    = P( "." ~ digits )
-   val integral      = P( "0" | CharIn('1' to '9') ~ digits.? )
+  val space = P(CharsWhile(Whitespace).?)
+  val digits = P(CharsWhile(Digits))
+  val exponent = P(CharIn("eE") ~ CharIn("+-").? ~ digits)
+  val fractional = P("." ~ digits)
+  val integral = P("0" | CharIn('1' to '9') ~ digits.?)
 
-   val number = P( CharIn("+-").? ~ integral ~ fractional.? ~ exponent.? ).!.map(
-     x => Js.Num(x.toDouble)
-   )
+  val number = P(CharIn("+-").? ~ integral ~ fractional.? ~ exponent.?).!.map(
+    x => Js.Num(x.toDouble)
+  )
 
-   val `null`        = P( "null" ).map(_ => Js.Null)
-   val `false`       = P( "false" ).map(_ => Js.False)
-   val `true`        = P( "true" ).map(_ => Js.True)
+  val `null` = P("null").map(_ => Js.Null)
+  val `false` = P("false").map(_ => Js.False)
+  val `true` = P("true").map(_ => Js.True)
 
-   val hexDigit      = P( CharIn('0'to'9', 'a'to'f', 'A'to'F') )
-   val unicodeEscape = P( "u" ~ hexDigit ~ hexDigit ~ hexDigit ~ hexDigit )
-   val escape        = P( "\\" ~ (CharIn("\"/\\bfnrt") | unicodeEscape) )
+  val hexDigit = P(CharIn('0' to '9', 'a' to 'f', 'A' to 'F'))
+  val unicodeEscape = P("u" ~ hexDigit ~ hexDigit ~ hexDigit ~ hexDigit)
+  val escape = P("\\" ~ (CharIn("\"/\\bfnrt") | unicodeEscape))
 
-   val strChars = P( CharsWhile(StringChars) )
-   val string =
-     P( space ~ "\"" ~/ (strChars | escape).rep.! ~ "\"").map(Js.Str)
+  val strChars = P(CharsWhile(StringChars))
+  val string =
+    P(space ~ "\"" ~/ (strChars | escape).rep.! ~ "\"").map(Js.Str)
 
-   val array =
-     P( "[" ~/ jsonExpr.rep(sep=",".~/) ~ space ~ "]").map( xs => Js.Arr(xs.toArray))
+  val array =
+    P("[" ~/ jsonExpr.rep(sep = ",".~/) ~ space ~ "]").map(xs => Js.Arr(xs.toArray))
 
-   val pair = P( string.map(_.value) ~/ ":" ~/ jsonExpr )
+  val pair = P(string.map(_.value) ~/ ":" ~/ jsonExpr)
 
-   val obj =
-     P( "{" ~/ pair.rep(sep=",".~/) ~ space ~ "}").map( xs => Js.Obj(xs.toMap) )
+  val obj =
+    P("{" ~/ pair.rep(sep = ",".~/) ~ space ~ "}").map(xs => Js.Obj(xs.toMap))
 
-   val jsonExpr: P[Js.Val] = P(
-     space ~ (obj | array | string | `true` | `false` | `null` | number) ~ space
-   )
+  val jsonExpr: P[Js.Val] = P(
+    space ~ (obj | array | string | `true` | `false` | `null` | number) ~ space
+  )
 
-   /* Define a specialized parser that suits exactly the format of the parsed dataset */
+  /* Define a specialized parser that suits exactly the format of the parsed dataset */
 
-   val total: Parser[Js.Num] = P( "\"total\"" ~ ":" ~ space ~ number ~ space ~ "," ~ space)
+  val total: Parser[Js.Num] = P("\"total\"" ~ ":" ~ space ~ number ~ space ~ "," ~ space)
 
-   val notRightBracket = NamedFunction(!"]".contains(_: Char), "NotRightBracket")
-   val anyCharNotRightBracket = P( CharsWhile(notRightBracket) )
-   val notRightCurlyBracket = NamedFunction(!"}".contains(_: Char), "NotRightCurlyBracket")
-   val untilRightCurlyBracket = P( CharsWhile(notRightCurlyBracket) )
-   val untilCommaFunction = NamedFunction(!",".contains(_: Char), "UntilComma")
-   val untilComma = P( CharsWhile(untilCommaFunction) )
+  val notRightBracket = NamedFunction(!"]".contains(_: Char), "NotRightBracket")
+  val anyCharNotRightBracket = P(CharsWhile(notRightBracket))
+  val notRightCurlyBracket = NamedFunction(!"}".contains(_: Char), "NotRightCurlyBracket")
+  val untilRightCurlyBracket = P(CharsWhile(notRightCurlyBracket))
+  val untilCommaFunction = NamedFunction(!",".contains(_: Char), "UntilComma")
+  val untilComma = P(CharsWhile(untilCommaFunction))
 
-   val logged = scala.collection.mutable.Buffer.empty[String]
-   implicit val logger = fastparse.Logger(logged.append(_))
-   val stringPair = P( string ~ ":" ~ space ~ string ~ space ~ "," )
+  val logged = scala.collection.mutable.Buffer.empty[String]
+  implicit val logger = fastparse.Logger(logged.append(_))
 
-   val unitToken = Js.Unitt('a')
-   val weeks: Parser[Js.Unitt] = P( "\"weeks\"" ~ space ~ ":" ~ space ~
-     "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => unitToken)
-   val author: Parser[Js.Str] = P("\"author\"" ~ space ~ ":" ~ space ~
-     "{" ~ space ~ "\"login\"" ~ space ~ ":" ~ space ~ string ~ "," ~
-     untilComma.rep(sep=",",max=15) ~ space ~ untilRightCurlyBracket ~ space ~  "}" ~ space)
+  val stringPair = P(string ~ ":" ~ space ~ string ~ space ~ ",")
 
-   val projection: P[Js.Arr] =
-     P( space ~ "{" ~ space ~ total ~ weeks ~ author ~ space ~ "}" ~ space).map {
-       case (t,w,a) => Js.Arr(Array(t, a))
-     }
+  val weeks: Parser[Unit] = P("\"weeks\"" ~ space ~ ":" ~ space ~
+    "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => ())
 
-   val projections: P[Js.Arr] =
-     P( "[" ~/ projection.rep(sep=",".~/) ~ "]").map(xs => Js.Arr(xs.toArray))
+  val author: Parser[Js.Str] = P {
+    "\"author\"" ~ space ~ ":" ~ space ~ "{" ~ space ~ "\"login\"" ~ 
+    space ~ ":" ~ space ~ string ~ "," ~ untilComma.rep(sep = ",", max = 15) ~ 
+    space ~ untilRightCurlyBracket ~ space ~ "}" ~ space
+  }
+
+  val projection: P[Js.Arr] =
+    P(space ~ "{" ~ space ~ total ~ weeks ~ author ~ space ~ "}" ~ space).map {
+      case (t, a) => Js.Arr(Array(t, a))
+    }
+
+  val projections: P[Js.Arr] =
+    P("[" ~/ projection.rep(sep = ",".~/) ~ "]").map(xs => Js.Arr(xs.toArray))
 }

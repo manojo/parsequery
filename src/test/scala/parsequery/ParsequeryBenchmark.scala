@@ -26,21 +26,21 @@ object ParsequeryBenchmark
 
     val range = Gen.enumeration("size")(10)
     performance of fname in {
-      measure method "parser" config(
+      measure method "parser" config (
         exec.minWarmupRuns -> 5,
         exec.maxWarmupRuns -> 10,
         exec.benchRuns -> 25,
         exec.independentSamples -> 4
       ) in {
-        using(range) in { n =>
-          // we use while to remove overhead of for ... yield
-          var i=0
-          while (i < n) {
-            f(fileContent)
-            i+=1
+          using(range) in { n =>
+            // we use while to remove overhead of for ... yield
+            var i = 0
+            while (i < n) {
+              f(fileContent)
+              i += 1
+            }
           }
         }
-      }
     }
   }
 
@@ -48,7 +48,7 @@ object ParsequeryBenchmark
     val Parsed.Success(resAll, _) = jsonExpr.parse(src)
     val ids2totals: List[(Val, Val)] = (resAll match {
       case x @ Arr(ls) =>
-        for(l <- ls) yield (l("author")("id"), l("total"))
+        for (l <- ls) yield (l("author")("id"), l("total"))
       case _ => sys.error("Something went wrong")
     }).toList
   }
