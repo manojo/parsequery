@@ -123,4 +123,13 @@ class HListParserSuite
     )
   }
 
+  /**
+   * Let's try mimic the structure of the contributions file
+   */
+//  test("github contributions parser") {
+//
+//
+//
+//  }
+
 }
