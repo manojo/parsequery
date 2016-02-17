@@ -225,4 +225,6 @@ trait RepetitionParsers extends Parsers {
     (acc: ArrayBuffer[T], t: T) => acc :+ t
   )
 
+  def unitFolder[T] = ((), (acc: Unit, t: T) => acc)
+
 }

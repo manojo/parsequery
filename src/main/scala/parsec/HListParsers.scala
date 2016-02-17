@@ -50,4 +50,14 @@ trait HListParsers extends Parsers with RepetitionParsers {
            (xs: L, in: Input)
            (implicit parsable: Parsable[L, Res]): ParseResult[Res] =
     parsable.parse(xs, in)
+
+  /**
+   * lift an HList of parsers into a parser
+   * ATTENTION, the parameter needs to be lazy for some reason,
+   * haven't figured it out yet
+   */
+  def mkParser[L <: HList, Res <: HList](xs: => L)
+              (implicit parsable: Parsable[L, Res]): Parser[Res] = Parser { in =>
+    parsable.parse(xs, in)
+  }
 }

@@ -44,7 +44,7 @@ class HListParserSuite
     /**
      * The "parser" we write
      */
-    val repConcats = rep(letter) :: rep(digit2Int) :: rep(letter) :: HNil
+    val repConcats = letters :: rep(digit2Int) :: letters :: HNil
 
     /**
      * This is a bit ugly cause we see the `FoldParser` type
@@ -76,6 +76,63 @@ class HListParserSuite
 
     checkSuccessH(res)(
       expected =  "oh" :: 15 :: "II" :: HNil, expectedPos = 12
+    )
+  }
+
+  test("a simple csv like parser, all elements known") {
+
+    import scala.collection.mutable.StringBuilder
+
+    /**
+     * Has to be a def since we need to always have a new
+     * stringbuilder
+     */
+    def first = letters.fold(
+      StringBuilder.newBuilder,
+      (acc: StringBuilder, c: Char) => acc append c
+    ).map(_.toString)
+
+    def last = letters.fold(
+      StringBuilder.newBuilder,
+      (acc: StringBuilder, c: Char) => acc append c
+    ).map(_.toString)
+
+    def age = number
+
+    val comma = accept(',')
+    val CRLF = accept('\n')
+
+    type Person = String :: String :: Int :: HNil
+
+    def personRecord = mkParser(
+      skipWs(first <~ comma) :: skipWs(last <~ comma) :: skipWs(age <~ CRLF) :: HNil
+    )
+
+    def peopleParser = rep(personRecord)
+    def adultsParser = peopleParser filter { case f :: l :: a :: HNil => a >= 18 }
+
+    def adultList = adultsParser.fold(
+      List[Person](),
+      (acc: List[Person], p: Person) => acc :+ p
+    )
+
+    val people = List(
+      "Roger, Federer, 34",
+      "Rafael, Nadal, 29",
+      "Random, Kid, 16",
+      "Novak, Djokovic, 28",
+      "Random, KidB, 12"
+    ).mkString("\n") + "\n"
+
+    val res = List(
+      "Roger" :: "Federer" :: 34 :: HNil,
+      "Rafael" :: "Nadal" :: 29 :: HNil,
+      "Novak" :: "Djokovic" :: 28 :: HNil
+    )
+
+    checkSuccess(adultList, CharReader(people.toArray))(
+      expected = res,
+      expectedPos = people.length
     )
   }
 

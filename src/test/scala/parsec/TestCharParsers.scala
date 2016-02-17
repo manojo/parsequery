@@ -77,4 +77,30 @@ class CharParsersSuite
     checkSuccess(number, biggerNum)(expected = 12345, expectedPos = 5)
   }
 
+  test("whitespace parser skips whitespaces") {
+
+    val spacedInput = "   o           h"
+    val spacedReader = CharReader(spacedInput.toArray)
+
+    val spacedLetters: Parser[(Char, Char)] =
+      (ignoreWs ~> accept('o')) ~ (ignoreWs ~> accept('h'))
+
+    checkSuccess(spacedLetters, spacedReader)(
+      expected = ('o', 'h'), expectedPos = spacedInput.length
+    )
+
+  }
+
+  test("the ignore parsers propagate position") {
+    checkSuccess(accept('o') ~> accept('h'), myReader)(
+      expected = ('h'),
+      expectedPos = 2
+    )
+
+    checkSuccess(accept('o') <~ accept('h'), myReader)(
+      expected = ('o'),
+      expectedPos = 2
+    )
+  }
+
 }
