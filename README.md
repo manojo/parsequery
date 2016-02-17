@@ -1,5 +1,7 @@
 # parsequery
 
+[![Build Status](https://travis-ci.org/manojo/parsequery.svg?branch=master)](https://travis-ci.org/manojo/parsequery)
+
 Example inputs
 --------------
 
