@@ -4,7 +4,7 @@ import shapeless._
 import poly._
 
 /**
- * This source code is compiled by an embedded compiler to 
+ * This source code is compiled by an embedded compiler to
  * check the compilation time of HList for extreme cases.
  *
  * Currently, there is only a dummy test that should be

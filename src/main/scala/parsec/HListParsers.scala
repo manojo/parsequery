@@ -19,7 +19,7 @@ trait HListParsers extends Parsers with RepetitionParsers {
   /** Parsing a single parser with True gives a result (base case proof) */
   implicit def baseCaseParsableTrue[T] = {
     new Parsable[Parser[T] :: HNil, True :: HNil, T :: HNil] {
-      def parse(ps: Parser[T] :: HNil, in: Input): ParseResult[T :: HNil] = 
+      def parse(ps: Parser[T] :: HNil, in: Input): ParseResult[T :: HNil] =
         ps.head(in).map { x => x :: HNil }
     }
   }
@@ -27,15 +27,14 @@ trait HListParsers extends Parsers with RepetitionParsers {
   /** Parsing a single parser with False gives a result (base case proof) */
   implicit def baseCaseParsableFalse[T] = {
     new Parsable[Parser[T] :: HNil, False :: HNil, HNil] {
-      def parse(ps: Parser[T] :: HNil, in: Input): ParseResult[HNil] = 
+      def parse(ps: Parser[T] :: HNil, in: Input): ParseResult[HNil] =
         ps.head(in).map { _ => HNil }
     }
   }
 
-  /** Parsing multiple parsers with a True attached will ignore 
+  /** Parsing multiple parsers with a True attached will ignore
    *  their result but still provide a result of the Parser. */
-  implicit def recursiveParsableTrue
-    [T, TS <: HList, BS <: HList, Res <: HList]
+  implicit def recursiveParsableTrue[T, TS <: HList, BS <: HList, Res <: HList]
     (implicit parsable: Parsable[TS, BS, Res]) = {
       new Parsable[Parser[T] :: TS, True :: BS, T :: Res] {
         def parse(ps: Parser[T] :: TS, in: Input): ParseResult[T :: Res] = {
@@ -50,10 +49,9 @@ trait HListParsers extends Parsers with RepetitionParsers {
       }
     }
 
-  /** Parsing multiple parsers with a False attached will ignore 
+  /** Parsing multiple parsers with a False attached will ignore
    *  their result but still provide a result of the Parser. */
-  implicit def recursiveParsableFalse
-    [T, TS <: HList, BS <: HList, Res <: HList]
+  implicit def recursiveParsableFalse[T, TS <: HList, BS <: HList, Res <: HList]
     (implicit parsable: Parsable[TS, BS, Res]) = {
       new Parsable[Parser[T] :: TS, False :: BS, Res] {
         def parse(ps: Parser[T] :: TS, in: Input): ParseResult[Res] = {
@@ -77,7 +75,7 @@ trait HListParsers extends Parsers with RepetitionParsers {
    *
    * TODO Figure out why the parameter needs to be lazy */
   def mkParser[L <: HList, B <: HList, Res <: HList](xs: => L)
-    (implicit parsable: Parsable[L, B, Res]): Parser[Res] = 
+    (implicit parsable: Parsable[L, B, Res]): Parser[Res] =
       Parser { in => parsable.parse(xs, in) }
 }
 
