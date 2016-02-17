@@ -61,4 +61,18 @@ class CharParsersSuite
     )
   }
 
+  test("parsing and recognizing strings works") {
+
+    val greeting = "greetings lion"
+    val greetReader = CharReader(greeting.toArray)
+
+    checkSuccess(
+      skipWs(stringParser("greetings")) ~ stringParser("lion"), greetReader
+    )(expected = ("greetings", "lion"), expectedPos = greeting.length)
+
+    checkSuccess(
+      skipWs(stringRecognizer("greetings")) ~> stringRecognizer("lion"), greetReader
+    )(expected = (), expectedPos = greeting.length)
+  }
+
 }
