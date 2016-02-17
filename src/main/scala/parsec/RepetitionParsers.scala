@@ -156,22 +156,6 @@ trait RepetitionParsers extends Parsers {
       this map (elem => (f(elem), elem))
 
     /**
-     * We can now concatenate a parser!
-     */
-    def ~[U](that: Parser[U]): FoldConcatParser[T, U] = new FoldConcatParser[T, U] {
-      def fold[R](z: R, combine: Combine[T, R]): Parser[(R, U)] =
-        self.fold(z, combine) ~ that
-    }
-
-    /**
-     * we can concatenate another rep parser too!
-     */
-    def ~[U](that: FoldParser[U]) = new FoldFoldParser[T, U] {
-      def fold[R1, R2](f1: FoldFunction[T, R1], f2: FoldFunction[U, R2]): Parser[(R1, R2)] =
-        self.fold[R1](f1._1, f1._2) ~ that.fold[R2](f2._1, f2._2)
-    }
-
-    /**
      * utility functions that make it easier to write fold-like functions
      */
     def toList: Parser[List[T]] = {
@@ -185,47 +169,6 @@ trait RepetitionParsers extends Parsers {
     def toSkipper: Parser[Unit] = self.fold((), (acc: Unit, _) => acc)
     def toLength: Parser[Int] = self.fold(0, (acc: Int, _) => acc + 1)
 
-  }
-
-  /**
-   * We need to be able to compose rep(a) ~ b in a way such that we can provide the fold function
-   * after the b. This needs to extend to any amount of concatenations. Should be do-able
-   * with this one extra class
-   */
-  abstract class FoldConcatParser[T, U] { self =>
-
-    /**
-     * the fold function still only holds for the first parser,
-     * i.e. we only fold over `T`
-     */
-    def fold[R](z: R, combine: Combine[T, R]): Parser[(R, U)]
-
-    /**
-     * Concatenation must become right associative now, because we don't
-     * want a `FoldConcatParser[((T, U), V)]
-     */
-    def ~[V](that: Parser[V]): FoldConcatParser[T, (U, V)] =  {
-      new FoldConcatParser[T, (U, V)] {
-        def fold[R](z: R, combine: Combine[T, R]): Parser[(R, (U, V))] = {
-          (self.fold(z, combine) ~ that) map {
-            case ((r, u), u2) => (r, (u, u2))
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * We need to be able to compose rep(a) ~ rep(b) as well.
-   */
-  abstract class FoldFoldParser[T, U] { self =>
-
-    type FoldFunction[A, R] = (R, Combine[A, R])
-
-    /**
-     * there are two fold functions now passed
-     */
-    def fold[R1, R2](f1: FoldFunction[T, R1], f2: FoldFunction[U, R2]): Parser[(R1, R2)]
   }
 
   /**
