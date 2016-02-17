@@ -52,7 +52,6 @@ object Js {
       this.asInstanceOf[Obj].value.find(_._1 == s).get._2
   }
 
-  case class Unitt(value: Char) extends AnyVal with Val
   case class Str(value: java.lang.String) extends AnyVal with Val
   case class Obj(value: Map[java.lang.String, Val]) extends AnyVal with Val
   case class Arr(value: Array[Val]) extends AnyVal with Val
@@ -132,18 +131,21 @@ trait JSONParser {
 
   val logged = scala.collection.mutable.Buffer.empty[String]
   implicit val logger = fastparse.Logger(logged.append(_))
+
   val stringPair = P(string ~ ":" ~ space ~ string ~ space ~ ",")
 
-  val unitToken = Js.Unitt('a')
-  val weeks: Parser[Js.Unitt] = P("\"weeks\"" ~ space ~ ":" ~ space ~
-    "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => unitToken)
-  val author: Parser[Js.Str] = P("\"author\"" ~ space ~ ":" ~ space ~
-    "{" ~ space ~ "\"login\"" ~ space ~ ":" ~ space ~ string ~ "," ~
-    untilComma.rep(sep = ",", max = 15) ~ space ~ untilRightCurlyBracket ~ space ~ "}" ~ space)
+  val weeks: Parser[Unit] = P("\"weeks\"" ~ space ~ ":" ~ space ~
+    "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => ())
+
+  val author: Parser[Js.Str] = P {
+    "\"author\"" ~ space ~ ":" ~ space ~ "{" ~ space ~ "\"login\"" ~ 
+    space ~ ":" ~ space ~ string ~ "," ~ untilComma.rep(sep = ",", max = 15) ~ 
+    space ~ untilRightCurlyBracket ~ space ~ "}" ~ space
+  }
 
   val projection: P[Js.Arr] =
     P(space ~ "{" ~ space ~ total ~ weeks ~ author ~ space ~ "}" ~ space).map {
-      case (t, w, a) => Js.Arr(Array(t, a))
+      case (t, a) => Js.Arr(Array(t, a))
     }
 
   val projections: P[Js.Arr] =
