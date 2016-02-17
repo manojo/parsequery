@@ -1,7 +1,7 @@
 lazy val Benchmark = config("bench") extend Test
 
 /**  This allows running ScalaMeter benchmarks in separate sbt configuration.
-  *  It means, that when you want run your benchmarks you should type 
+  *  It means, that when you want run your benchmarks you should type
   *  `bench:test` in sbt console.
   */
 lazy val basic = Project(

@@ -78,23 +78,18 @@ trait RepetitionParsers extends Parsers {
   }
 
   /**
-   * all functions on cpslists will have the F prefix (for fold)
-   *
-   * @TODO It would be nice to not have `R` popping out in the parameters here.
-   * So that we only need specify the type at the very end.
-   * an alternate design is to have `fold` carry it:
-   * def fold[R](z: R, comb: Combine[T, R]): R
+   * Just the usual fold parser
    */
   abstract class FoldParser[T] { self =>
 
     def fold[R](z: R, combine: Combine[T, R]): Parser[R]
 
     /**
-     * mapF. Pretty nice, cause we can forward the map
+     * map. Pretty nice, cause we can forward the map
      * function over to the underlying parser, it's exactly
      * the same!
      */
-    def mapF[U](f: T => U) = new FoldParser[U] {
+    def map[U](f: T => U) = new FoldParser[U] {
       def fold[R](z: R, combine: Combine[U, R]): Parser[R] = self.fold(
         z,
         (acc: R, elem: T) => combine(acc, f(elem))
@@ -104,9 +99,8 @@ trait RepetitionParsers extends Parsers {
     /**
      * filter
      */
-    def filterF(p: T => Boolean) = new FoldParser[T] {
-
-      override def fold[R](z: R, comb: Combine[T, R]) = self.fold(
+    def filter(p: T => Boolean) = new FoldParser[T] {
+      def fold[R](z: R, comb: Combine[T, R]) = self.fold(
         z,
         (acc: R, elem: T) => if (p(elem)) comb(acc, elem) else acc
       )
@@ -135,8 +129,8 @@ trait RepetitionParsers extends Parsers {
      * see the following related post: http://manojo.github.io/2015/03/03/staged-foldleft-partition/
      */
     def partition(p: T => Boolean): (FoldParser[T], FoldParser[T]) = {
-      val trues = this filterF p
-      val falses = this filterF (a => !p(a))
+      val trues = this filter p
+      val falses = this filter (a => !p(a))
       (trues, falses)
     }
 
@@ -148,7 +142,7 @@ trait RepetitionParsers extends Parsers {
      * see the following related post: http://manojo.github.io/2015/03/12/staged-foldleft-groupby/
      */
     def partitionBis(p: T => Boolean) =
-      this mapF (elem => if (p(elem)) Left(elem) else Right(elem))
+      this map (elem => if (p(elem)) Left(elem) else Right(elem))
 
     /**
      * groupWith
@@ -159,7 +153,7 @@ trait RepetitionParsers extends Parsers {
      * see the following related post: http://manojo.github.io/2015/03/12/staged-foldleft-groupby/
      */
     def groupWith[K](f: T => K): FoldParser[(K, T)] =
-      this mapF (elem => (f(elem), elem))
+      this map (elem => (f(elem), elem))
 
     /**
      * We can now concatenate a parser!
@@ -195,9 +189,14 @@ trait RepetitionParsers extends Parsers {
      * Concatenation must become right associative now, because we don't
      * want a `FoldConcatParser[((T, U), V)]
      */
-    def ~[V](that: Parser[V]): FoldConcatParser[T, (U, V)] = new FoldConcatParser[T, (U, V)] {
-      def fold[R](z: R, combine: Combine[T, R]): Parser[(R, (U, V))] =
-        (self.fold(z, combine) ~ that) map { case ((r, u), u2) => (r, (u, u2)) }
+    def ~[V](that: Parser[V]): FoldConcatParser[T, (U, V)] =  {
+      new FoldConcatParser[T, (U, V)] {
+        def fold[R](z: R, combine: Combine[T, R]): Parser[(R, (U, V))] = {
+          (self.fold(z, combine) ~ that) map {
+            case ((r, u), u2) => (r, (u, u2))
+          }
+        }
+      }
     }
   }
 
@@ -221,6 +220,9 @@ trait RepetitionParsers extends Parsers {
   def lengthFolder[T] = (0, (acc: Int, t: T) => acc + 1)
 
   import scala.collection.mutable.ArrayBuffer
-  def arrayBufFolder[T] = (ArrayBuffer.empty[T], (acc: ArrayBuffer[T], t: T) => acc :+ t)
+  def arrayBufFolder[T] = (
+    ArrayBuffer.empty[T],
+    (acc: ArrayBuffer[T], t: T) => acc :+ t
+  )
 
 }
