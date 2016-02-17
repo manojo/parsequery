@@ -17,7 +17,7 @@ object ParsequeryBenchmark extends Bench.ForkedTime with JSONParser {
   override def persistor = Persistor.None
   override def reporter = new LoggingReporter
 
-  def benchmark(fname: String, f: String => _) {
+  def benchmark(fname: String, f: String => _): Unit = {
     import scala.io.Source
     val fileName = "data/scala-lang-contributions.json"
     val fileContent = Source.fromFile(fileName).mkString
