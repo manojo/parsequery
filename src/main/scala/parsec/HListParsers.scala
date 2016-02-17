@@ -16,17 +16,18 @@ trait HListParsers extends Parsers with RepetitionParsers {
   /**
    * Parsing a single parser gives its result
    */
-  implicit def singleParsable[T] =
+  implicit def singleParsable[T] = {
     new Parsable[Parser[T] :: HNil, T :: HNil] {
       def parse(ps: Parser[T] :: HNil, in: Input): ParseResult[T :: HNil]
         = ps.head(in).map { x => x :: HNil }
     }
+  }
 
   /**
    * Parsing recursively works too
    */
   implicit def recParsable[T, TS <: HList, Res <: HList]
-                          (implicit parsable: Parsable[TS, Res]) =
+                          (implicit parsable: Parsable[TS, Res]) = {
     new Parsable[Parser[T] :: TS, T :: Res] {
       def parse(ps: Parser[T] :: TS, in: Input): ParseResult[T :: Res] = {
         val (hd, tl) = (ps.head, ps.tail)
@@ -39,6 +40,7 @@ trait HListParsers extends Parsers with RepetitionParsers {
         }
       }
     }
+  }
 
   /**
    * parsing a HList of parsers,
@@ -46,6 +48,6 @@ trait HListParsers extends Parsers with RepetitionParsers {
    */
   def parse[L <: HList, Res <: HList]
            (xs: L, in: Input)
-           (implicit parsable: Parsable[L, Res]) : ParseResult[Res] =
+           (implicit parsable: Parsable[L, Res]): ParseResult[Res] =
     parsable.parse(xs, in)
 }

@@ -15,7 +15,7 @@ class CharParsersSuite
     val twoCharParser = accept('o') ~ accept('h')
     twoCharParser(myReader) match {
       case Success(res, rest) => rest match {
-        case CharReader(_, pos) => assert(res == ('o', 'h') && pos == 2)
+        case CharReader(_, pos) => assert(res == (('o', 'h')) && pos == 2)
         case _ => assert(false)
       }
 
@@ -41,15 +41,16 @@ class CharParsersSuite
   test("can parse a word, a digit, and another letter") {
     val (strZ, strCombine) = stringFolder
 
-    val wordDigitLetter: Parser[(String, (Char, Char))] =
+    val wordDigitLetter: Parser[(String, (Char, Char))] = {
       (letters ~ digit ~ letter).fold(strZ, strCombine) map {
         case (ls, other) => (ls.toString, other)
       }
+    }
 
     wordDigitLetter(myReader) match {
       case Success(res, rest) => rest match {
         case CharReader(_, pos) =>
-          assert(res == ("oh", ('3', 'h')) && pos == 4)
+          assert(res == (("oh", ('3', 'h'))) && pos == 4)
         case _ => assert(false)
       }
       case _ => assert(false)
@@ -67,7 +68,7 @@ class CharParsersSuite
     digitword(CharReader("3hiagain!".toArray)) match {
       case Success(res, rest) => rest match {
         case CharReader(_, pos) =>
-          assert(res == ('3', "hiagain") && pos == 8)
+          assert(res == (('3', "hiagain")) && pos == 8)
         case _ => assert(false)
       }
       case _ => assert(false)
@@ -85,7 +86,31 @@ class CharParsersSuite
     wordsdigits(CharReader("hithere12345!".toArray)) match {
       case Success(res, rest) => rest match {
         case CharReader(_, pos) =>
-          assert(res == ("hithere", "12345") && pos == 12)
+          assert(res == (("hithere", "12345")) && pos == 12)
+        case _ => assert(false)
+      }
+      case _ => assert(false)
+    }
+  }
+
+  test("number parser works as expected") {
+
+    val zero = CharReader("".toArray)
+    val biggerNum = CharReader("12345".toArray)
+
+    number(zero) match {
+      case Success(res, rest) => rest match {
+        case CharReader(_, pos) =>
+          assert(res == 0 && pos == 0)
+        case _ => assert(false)
+      }
+      case _ => assert(false)
+    }
+
+    number(biggerNum) match {
+      case Success(res, rest) => rest match {
+        case CharReader(_, pos) =>
+          assert(res == 12345 && pos == 5)
         case _ => assert(false)
       }
       case _ => assert(false)

@@ -189,9 +189,14 @@ trait RepetitionParsers extends Parsers {
      * Concatenation must become right associative now, because we don't
      * want a `FoldConcatParser[((T, U), V)]
      */
-    def ~[V](that: Parser[V]): FoldConcatParser[T, (U, V)] = new FoldConcatParser[T, (U, V)] {
-      def fold[R](z: R, combine: Combine[T, R]): Parser[(R, (U, V))] =
-        (self.fold(z, combine) ~ that) map { case ((r, u), u2) => (r, (u, u2)) }
+    def ~[V](that: Parser[V]): FoldConcatParser[T, (U, V)] =  {
+      new FoldConcatParser[T, (U, V)] {
+        def fold[R](z: R, combine: Combine[T, R]): Parser[(R, (U, V))] = {
+          (self.fold(z, combine) ~ that) map {
+            case ((r, u), u2) => (r, (u, u2))
+          }
+        }
+      }
     }
   }
 
@@ -215,6 +220,9 @@ trait RepetitionParsers extends Parsers {
   def lengthFolder[T] = (0, (acc: Int, t: T) => acc + 1)
 
   import scala.collection.mutable.ArrayBuffer
-  def arrayBufFolder[T] = (ArrayBuffer.empty[T], (acc: ArrayBuffer[T], t: T) => acc :+ t)
+  def arrayBufFolder[T] = (
+    ArrayBuffer.empty[T],
+    (acc: ArrayBuffer[T], t: T) => acc :+ t
+  )
 
 }

@@ -138,8 +138,8 @@ trait JSONParser {
     "[" ~ space ~ anyCharNotRightBracket ~ space ~ "]," ~ space).map(_ => ())
 
   val author: Parser[Js.Str] = P {
-    "\"author\"" ~ space ~ ":" ~ space ~ "{" ~ space ~ "\"login\"" ~ 
-    space ~ ":" ~ space ~ string ~ "," ~ untilComma.rep(sep = ",", max = 15) ~ 
+    "\"author\"" ~ space ~ ":" ~ space ~ "{" ~ space ~ "\"login\"" ~
+    space ~ ":" ~ space ~ string ~ "," ~ untilComma.rep(sep = ",", max = 15) ~
     space ~ untilRightCurlyBracket ~ space ~ "}" ~ space
   }
 

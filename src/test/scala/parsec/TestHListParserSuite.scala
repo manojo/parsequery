@@ -50,7 +50,6 @@ class HListParserSuite
   test("concating three repped parsers works") {
 
     val classicVowels = Set('a', 'e', 'i', 'o', 'u')
-    def digit2Int: Parser[Int] = digit map { x => (x - '0').toInt }
     def isVowel(c: Char) = classicVowels contains c
 
     /**

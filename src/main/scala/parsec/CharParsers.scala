@@ -12,8 +12,13 @@ trait CharParsers extends Parsers with RepetitionParsers {
    */
   def letter: Parser[Char] = acceptIf(_.isLetter)
   def digit: Parser[Char] = acceptIf(_.isDigit)
+  def digit2Int: Parser[Int] = digit map { c => (c - '0').toInt }
+
+
   def letters = rep(letter)
   def digits = rep(digit)
+  def number: Parser[Int] =
+    rep(digit2Int).fold[Int](0, (acc, n) => acc * 10 + n)
 
   /**
    * some handy reducers
@@ -29,10 +34,11 @@ object HelloCharParsers extends CharParsers {
 
   val (strZ, strCombine) = stringFolder
 
-  val wordDigitLetter: Parser[(String, Char)] = 
+  val wordDigitLetter: Parser[(String, Char)] = {
     (letters ~ digit).fold(strZ, strCombine) map {
       case (ls, other) => (ls.toString, other)
     }
+  }
 
   def main(args: Array[String]): Unit = {
     val myReader = CharReader("oh3hiagain!".toArray)
