@@ -25,7 +25,8 @@ class CharParsersSuite
 
   test("can parse a word") {
     val (strZ, strCombine) = stringFolder
-    val wordParser: Parser[String] = letters.fold(strZ, strCombine).map(_.toString)
+    val wordParser: Parser[String] = 
+      letters.fold(strZ, strCombine).map(_.toString)
 
     wordParser(myReader) match {
       case Success(res, rest) => rest match {
@@ -39,9 +40,10 @@ class CharParsersSuite
   test("can parse a word, a digit, and another letter") {
     val (strZ, strCombine) = stringFolder
 
-    val wordDigitLetter: Parser[(String, (Char, Char))] = (letters ~ digit ~ letter).fold(strZ, strCombine) map {
-      case (ls, other) => (ls.toString, other)
-    }
+    val wordDigitLetter: Parser[(String, (Char, Char))] = 
+      (letters ~ digit ~ letter).fold(strZ, strCombine) map {
+        case (ls, other) => (ls.toString, other)
+      }
 
     wordDigitLetter(myReader) match {
       case Success(res, rest) => rest match {

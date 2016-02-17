@@ -1,5 +1,3 @@
-import com.typesafe.sbt.SbtScalariform
-
 lazy val Benchmark = config("bench") extend Test
 
 /**  This allows running ScalaMeter benchmarks in separate sbt configuration.
@@ -9,8 +7,7 @@ lazy val Benchmark = config("bench") extend Test
 lazy val basic = Project(
   "basic-with-separate-config",
   file("."),
-  settings = Defaults.coreDefaultSettings ++ 
-    SbtScalariform.scalariformSettings ++ Seq(
+  settings = Defaults.coreDefaultSettings ++ Seq(
     name := "parsequery",
     organization := "functadelic",
     scalaVersion := "2.11.7",

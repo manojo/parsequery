@@ -6,7 +6,7 @@ object HelloJSON extends JSONParser {
 
   import Js._
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
 
     val src: String = io.Source.fromFile("data/scala-lang-contributions.json").mkString
 
@@ -59,13 +59,13 @@ object Js {
   case class Num(value: Double) extends AnyVal with Val
 
   case object False extends Val {
-    def value = false
+    def value: Boolean = false
   }
   case object True extends Val {
-    def value = true
+    def value: Boolean = true
   }
   case object Null extends Val {
-    def value = null
+    def value: Val = null
   }
 }
 
@@ -76,10 +76,10 @@ object Js {
 trait JSONParser {
 
   case class NamedFunction[T, V](f: T => V, name: String) extends (T => V) {
-    def apply(t: T) = f(t)
-    override def toString() = name
-
+    def apply(t: T): V = f(t)
+    override def toString(): String = name
   }
+
   // Here is the parser
   val Whitespace = NamedFunction(" \r\n".contains(_: Char), "Whitespace")
   val Digits = NamedFunction('0' to '9' contains (_: Char), "Digits")
