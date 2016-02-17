@@ -3,8 +3,7 @@ package parsequery
 import org.scalameter.api._
 import org.scalameter.picklers.Implicits._
 
-object ParsequeryBenchmark
-    extends Bench.ForkedTime with JSONParser {
+object ParsequeryBenchmark extends Bench.ForkedTime with JSONParser {
 
   import Js._
   import fastparse.all._
