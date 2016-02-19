@@ -14,14 +14,14 @@ import poly._
 object Shapeless {
   def test(a: String, b: Int, c: Double, d: Char) =
     a :: b :: c :: d ::
-      a :: b :: c :: d ::
-      a :: b :: c :: d ::
-      a :: b :: c :: d ::
-      a :: b :: c :: d ::
-      a :: b :: c :: d ::
-      a :: b :: c :: d ::
-      a :: b :: c :: d ::
-      a :: b :: c :: d :: HNil
+    a :: b :: c :: d ::
+    a :: b :: c :: d ::
+    a :: b :: c :: d ::
+    a :: b :: c :: d ::
+    a :: b :: c :: d ::
+    a :: b :: c :: d ::
+    a :: b :: c :: d ::
+    a :: b :: c :: d :: HNil
 
   (0 to 100).map(_ => test("foo.bar.baz", 123123, 431.4, 'a'))
 }
