@@ -87,9 +87,6 @@ class HListParserSuite
     def last = letters.toStringParser
     def age = number
 
-    val comma = accept(',')
-    val CRLF = accept('\n')
-
     type Person = String :: String :: Int :: HNil
 
     def personRecord = mkParser(
@@ -101,7 +98,7 @@ class HListParserSuite
       case f :: l :: a :: HNil => a >= 18
     }
 
-    def adultList = adultsParser.toList
+    def adultList = adultsParser.toListParser
 
     val people = List(
       "Roger, Federer, 34",
@@ -123,13 +120,199 @@ class HListParserSuite
     )
   }
 
-  /**
-   * Let's try mimic the structure of the contributions file
-   */
-//  test("github contributions parser") {
-//
-//
-//
-//  }
+  /* Let's try mimic the structure of the contributions file */
 
+  /* parses the total key value pair */
+  def total: Parser[Int] = (skipWs(accept('\"') ~> recognize("total") ~> accept('\"')) ~>
+    accept(':') ~> skipWs(number))
+
+  /* parses a week. See format below for what it looks like */
+  def weekParser: Parser[List[(String, Int)]] = (skipWs(accept('{')) ~> CRLF ~>
+    repsep(skipWs((stringLiteral <~ accept(':'))) ~ skipWs(number), skipWs(comma <~ CRLF)).toListParser
+  <~ CRLF <~ skipWs(accept('}')))
+
+  /* parses multiple weeks */
+  def weeks: Parser[List[List[(String, Int)]]] = (skipWs(accept('\"') ~> recognize("weeks") ~> accept('\"')) ~>
+    (accept(':') ~> skipWs(accept('[')) ~> CRLF) ~>
+    repsep(weekParser, skipWs(comma <~ CRLF)).toListParser
+  <~ CRLF <~ skipWs(accept(']')))
+
+  /* parses author key-value pair */
+  def authorName: Parser[String] = (skipWs(accept('\"') ~> recognize("author") ~> accept('\"'))
+    ~> accept(':') ~> authorInnerInfo
+  )
+
+  /* parses login key-value pair */
+  def login: Parser[String] = (skipWs(accept('\"') ~> recognize("login") ~> accept('\"'))
+    ~> accept(':') ~> skipWs(stringLiteral)
+  )
+
+  /* parses author inner info */
+  def authorInnerInfo: Parser[String] = (skipWs(accept('{')) ~> CRLF ~>
+    (login <~ skipWs(comma <~ CRLF)) <~
+    repsep(skipWs((stringLiteral <~ accept(':'))) ~ skipWs(stringLiteral), skipWs(comma <~ CRLF)).toSkipper
+  <~ CRLF <~ skipWs(accept('}')))
+
+  def oneContribution = (
+    skipWs(accept('{')) ~> CRLF ~> (total <~ skipWs(comma <~ CRLF)) ~
+    (weeks <~ skipWs(comma <~ CRLF)) ~
+    authorName <~ CRLF <~ skipWs(accept('}'))
+  )
+
+
+
+  test("github contributions parser: can parse a single week") {
+
+    /**
+     * @TODO, this parser is a bit brittle. It should be able to hand spaces and
+     * line breaks as the same thing to work properly
+     */
+    val noWeekInfo = """{
+
+    }""".toArray
+
+    val oneWeekInfo ="""{
+      "w": 1333238400,
+      "a": 0,
+      "d": 0,
+      "c": 0
+    }""".toArray
+
+    checkSuccess(weekParser, CharReader(noWeekInfo))(
+      expected = List(),
+      expectedPos = noWeekInfo.length
+    )
+
+    checkSuccess(weekParser, CharReader(oneWeekInfo))(
+      expected = List(("w", 1333238400), ("a", 0), ("d", 0), ("c", 0)),
+      expectedPos = oneWeekInfo.length
+    )
+  }
+
+  test("github contributions parser: can parse multiple weeks") {
+
+    /**
+     * @TODO, this parser is a bit brittle. It should be able to hand spaces and
+     * line breaks as the same thing to work properly
+     */
+    val noWeeks = """"weeks": [
+
+    ]""".toArray
+
+    val oneWeek =""""weeks": [
+      {
+        "w": 1333238400,
+        "a": 0,
+        "d": 0,
+        "c": 0
+      }
+    ]""".toArray
+
+    val threeWeeks =""""weeks": [
+      {
+        "w": 1333238400,
+        "a": 0,
+        "d": 0,
+        "c": 0
+      },
+      {
+        "w": 1333843200,
+        "a": 0,
+        "d": 0,
+        "c": 0
+      },
+      {
+        "w": 1334448000,
+        "a": 0,
+        "d": 0,
+        "c": 0
+      }
+    ]""".toArray
+
+    checkSuccess(weeks, CharReader(noWeeks))(
+      expected = List(),
+      expectedPos = noWeeks.length
+    )
+
+    checkSuccess(weeks, CharReader(oneWeek))(
+      expected = List(
+        List(("w", 1333238400), ("a", 0), ("d", 0), ("c", 0))
+      ),
+      expectedPos = oneWeek.length
+    )
+
+    checkSuccess(weeks, CharReader(threeWeeks))(
+      expected = List(
+        List(("w", 1333238400), ("a", 0), ("d", 0), ("c", 0)),
+        List(("w", 1333843200), ("a", 0), ("d", 0), ("c", 0)),
+        List(("w", 1334448000), ("a", 0), ("d", 0), ("c", 0))
+      ),
+      expectedPos = threeWeeks.length
+    )
+  }
+
+  test("can parse login info") {
+    val loginInfo = """ "login": "dotta" """.toArray
+    checkSuccess(login, CharReader(loginInfo))(
+      expected = "dotta",
+      expectedPos = loginInfo.length
+    )
+  }
+
+  test("github contributions parser: can parse a single contribution") {
+    val singleContribution = """{
+      "total": 1,
+      "weeks": [
+        {
+          "w": 1333238400,
+          "a": 0,
+          "d": 0,
+          "c": 0
+        },
+        {
+          "w": 1333843200,
+          "a": 0,
+          "d": 0,
+          "c": 0
+        },
+        {
+          "w": 1334448000,
+          "a": 0,
+          "d": 0,
+          "c": 0
+        }
+      ],
+      "author": {
+        "login": "dotta",
+        "id": "703748",
+        "avatar_url": "https://avatars.githubusercontent.com/u/703748?v=3",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/dotta",
+        "html_url": "https://github.com/dotta",
+        "followers_url": "https://api.github.com/users/dotta/followers",
+        "following_url": "https://api.github.com/users/dotta/following{/other_user}",
+        "gists_url": "https://api.github.com/users/dotta/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/dotta/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/dotta/subscriptions",
+        "organizations_url": "https://api.github.com/users/dotta/orgs",
+        "repos_url": "https://api.github.com/users/dotta/repos",
+        "events_url": "https://api.github.com/users/dotta/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/dotta/received_events",
+        "type": "User",
+        "site_admin": "false"
+      }
+    }""".toArray
+
+    checkSuccess(oneContribution, CharReader(singleContribution))(
+      expected = (
+        (1,
+         List(
+          List(("w", 1333238400), ("a", 0), ("d", 0), ("c", 0)),
+          List(("w", 1333843200), ("a", 0), ("d", 0), ("c", 0)),
+          List(("w", 1334448000), ("a", 0), ("d", 0), ("c", 0))
+         )
+        ), "dotta"),
+      expectedPos = singleContribution.length
+    )
+  }
 }
