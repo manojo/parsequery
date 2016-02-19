@@ -14,6 +14,8 @@ trait CharParsers extends Parsers with RepetitionParsers {
   def digit: Parser[Char] = acceptIf(_.isDigit)
   def digit2Int: Parser[Int] = digit map { c => (c - '0').toInt }
   def singleSpace: Parser[Char] = accept(' ')
+  def comma = accept(',')
+  def CRLF = accept('\n')
 
   def letters = rep(letter)
   def digits = rep(digit)
@@ -27,7 +29,7 @@ trait CharParsers extends Parsers with RepetitionParsers {
    * parses a string passed as a parameter
    * returns the string in question if successful
    */
-  def stringParser(s: String): Parser[String] = Parser { in =>
+  def accept(s: String): Parser[String] = Parser { in =>
     import scala.annotation.tailrec
 
     val arr = s.toArray
@@ -48,7 +50,7 @@ trait CharParsers extends Parsers with RepetitionParsers {
    * returns unit, as the success of the parse is captured in
    * the type of ParseResult already
    */
-  def stringRecognizer(s: String): Parser[Unit] = Parser { in =>
+  def recognize(s: String): Parser[Unit] = Parser { in =>
     import scala.annotation.tailrec
 
     val arr = s.toArray
@@ -63,6 +65,14 @@ trait CharParsers extends Parsers with RepetitionParsers {
 
     loop(in, 0)
   }
+
+  /**
+   * parses a simple string literal, does not handle "weird" characters yet.
+   * weird characters include much of unicode (stuff that starts with \\u???)
+   */
+  def stringLiteral: Parser[String] =
+    accept('\"') ~> rep(acceptIf(_ != '\"')).toStringParser <~ accept('\"')
+
 
   /**
    * surrounds any parser with a whitespace ignoring parser
