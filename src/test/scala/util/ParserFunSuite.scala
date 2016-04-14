@@ -21,7 +21,10 @@ class ParserFunSuite
         case CharReader(_, pos) => assert(res == expected && pos == expectedPos)
         case _ => assert(false, "Expecting a CharReader, but found some other Reader")
       }
-      case _ => assert(false, "Expecting a success, but parser failed on input")
+      case f @ Failure(_, rest) => assert(
+        false,
+        s"Expecting a success, but parser failed on input at pos ${rest.asInstanceOf[CharReader].pos}"
+      )
     }
   }
 }

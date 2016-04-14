@@ -51,15 +51,42 @@ trait RepetitionParsers extends Parsers {
   def rep[T](p: Parser[T]) = fromParser(p)
 
   /**
+   * repeatedly parses `parser`, interspersed with the `sep` parser
+   * we must bake this in as a specific `FoldParser`, because we want to
+   * use the `combine` function for the first parse result as well.
+   * TODO: could `sep` always be a `Parser[Unit]`?
+   */
+  def repsep[T, U](parser: Parser[T], sep: => Parser[U]): FoldParser[T] = new FoldParser[T] {
+
+    def fold[R](z: R, combine: Combine[T, R]): Parser[R] = Parser { in =>
+
+      /* The loop runs over the composed parser */
+      @tailrec
+      def loop(curIn: Input, curRes: R): ParseResult[R] = (sep ~> parser)(curIn) match {
+        case Success(res, rest) => loop(rest, combine(curRes, res))
+        /* The rest is where we started failing*/
+        case Failure(_, _) => Success(curRes, curIn)
+      }
+
+      /**
+       * We need to run `parser` once, for getting the first result
+       */
+      parser(in) match {
+        case Success(res, rest) => loop(rest, combine(z, res))
+        case Failure(_, _) => Success(z, in)
+      }
+    }
+
+  }
+
+  /**
    * the repetition parser yields a `R` which is the result type
    * of a `FoldParser`.
    *
    * We need to have a CPSList hanging around
    */
 
-  /**
-   * create a FoldParser given a parser
-   */
+  /* create a `FoldParser` given a parser */
   def fromParser[T](parser: Parser[T]): FoldParser[T] = new FoldParser[T] {
     def fold[R](z: R, combine: Combine[T, R]): Parser[R] = Parser { in =>
 
@@ -158,7 +185,7 @@ trait RepetitionParsers extends Parsers {
     /**
      * utility functions that make it easier to write fold-like functions
      */
-    def toList: Parser[List[T]] = {
+    def toListParser: Parser[List[T]] = {
       import scala.collection.mutable.ListBuffer
       self.fold[ListBuffer[T]](
         ListBuffer.empty[T],

@@ -61,4 +61,61 @@ class CharParsersSuite
     )
   }
 
+  test("parsing and recognizing strings works") {
+
+    val greeting = "greetings lion"
+    val greetReader = CharReader(greeting.toArray)
+
+    checkSuccess(skipWs(accept("greetings")) ~ accept("lion"), greetReader)(
+      expected = ("greetings", "lion"),
+      expectedPos = greeting.length
+    )
+
+    checkSuccess(
+      skipWs(recognize("greetings")) ~> recognize("lion"), greetReader
+    )(expected = (), expectedPos = greeting.length)
+  }
+
+  test("parsing string literals works") {
+
+    val emptyStringLit = "\"\"".toArray
+    val aQuote = "\"Dr. Livingstone, I presume?\"".toArray
+
+    checkSuccess(stringLiteral, CharReader(emptyStringLit))(
+      expected = "",
+      expectedPos = emptyStringLit.length
+    )
+
+    checkSuccess(stringLiteral, CharReader(aQuote))(
+      expected = "Dr. Livingstone, I presume?",
+      expectedPos = aQuote.length
+    )
+  }
+
+  test("repsep works") {
+
+    val noNames = "".toArray
+    val justOneName = """ "Roger" """.toArray
+    val names = """ "Roger", "Rafa", "Nole", "Stan" """.toArray
+
+    def nameParser: Parser[List[String]]
+      = repsep(skipWs(stringLiteral), comma).toListParser
+
+    checkSuccess(nameParser, CharReader(names))(
+      expected = List("Roger", "Rafa", "Nole", "Stan"),
+      expectedPos = names.length
+    )
+
+    checkSuccess(nameParser, CharReader(noNames))(
+      expected = List(),
+      expectedPos = noNames.length
+    )
+
+    checkSuccess(nameParser, CharReader(justOneName))(
+      expected = List("Roger"),
+      expectedPos = justOneName.length
+    )
+
+  }
+
 }

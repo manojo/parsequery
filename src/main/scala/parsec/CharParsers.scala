@@ -14,7 +14,8 @@ trait CharParsers extends Parsers with RepetitionParsers {
   def digit: Parser[Char] = acceptIf(_.isDigit)
   def digit2Int: Parser[Int] = digit map { c => (c - '0').toInt }
   def singleSpace: Parser[Char] = accept(' ')
-
+  def comma = accept(',')
+  def CRLF = accept('\n')
 
   def letters = rep(letter)
   def digits = rep(digit)
@@ -23,6 +24,55 @@ trait CharParsers extends Parsers with RepetitionParsers {
 
   def ws = rep(singleSpace)
   def ignoreWs = ws.toSkipper
+
+  /**
+   * parses a string passed as a parameter
+   * returns the string in question if successful
+   */
+  def accept(s: String): Parser[String] = Parser { in =>
+    import scala.annotation.tailrec
+
+    val arr = s.toArray
+
+    @tailrec
+    def loop(curIn: Input, curIdx: Int): ParseResult[String] = {
+      if (curIn.atEnd) Failure(s"failed to match $s, went out of bounds", in)
+      if (curIdx >= arr.length) Success(s, curIn)
+      else if (curIn.first != arr(curIdx)) Failure(s"failed to match $s", in)
+      else loop(curIn.rest, curIdx + 1)
+    }
+
+    loop(in, 0)
+  }
+
+  /**
+   * __recognizes__ a string passed as a parameter
+   * returns unit, as the success of the parse is captured in
+   * the type of ParseResult already
+   */
+  def recognize(s: String): Parser[Unit] = Parser { in =>
+    import scala.annotation.tailrec
+
+    val arr = s.toArray
+
+    @tailrec
+    def loop(curIn: Input, curIdx: Int): ParseResult[Unit] = {
+      if (curIn.atEnd) Failure(s"failed to match $s, went out of bounds", in)
+      if (curIdx >= arr.length) Success((), curIn)
+      else if (curIn.first != arr(curIdx)) Failure(s"failed to match $s", in)
+      else loop(curIn.rest, curIdx + 1)
+    }
+
+    loop(in, 0)
+  }
+
+  /**
+   * parses a simple string literal, does not handle "weird" characters yet.
+   * weird characters include much of unicode (stuff that starts with \\u???)
+   */
+  def stringLiteral: Parser[String] =
+    accept('\"') ~> rep(acceptIf(_ != '\"')).toStringParser <~ accept('\"')
+
 
   /**
    * surrounds any parser with a whitespace ignoring parser
