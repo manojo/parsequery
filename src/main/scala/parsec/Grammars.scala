@@ -5,8 +5,6 @@ import ops.hlist._
 
 trait Grammars {
 
-  //type MyList[T] = RepeatGrammar[T]
-
   case class ~[+A, +B](_1: A, _2: B) {
     def map[C, D](f: A => C, g: B => D): C ~ D = new ~(f(_1), g(_2))
   }
@@ -16,6 +14,31 @@ trait Grammars {
     def apply(t: T ~ U) = t map (f1, f2)
   }
 
+  type Id[T] = T
+
+  /**
+   * F has a map on it
+   */
+  abstract class Mappable[F[_]] {
+    def map[T, U](f: T => U): F[T] => F[U]
+  }
+
+  implicit object IdMappable extends Mappable[Id] {
+    def map[T, U](f: T => U) = (x: T) => f(x)
+  }
+
+  implicit object GrammarMappable extends Mappable[Grammar] {
+    def map[T, U](f: T => U) = (g: Grammar[T]) => g map f
+  }
+
+  /**
+   * inspired from
+   * https://www.safaribooksonline.com/blog/2013/05/28/scala-type-classes-demystified/
+   */
+  implicit class FOps[F[_]: Mappable, T](t: F[T]) {
+    val witness = implicitly[Mappable[F]]
+    def map[U](f: T => U): F[U] = witness.map[T, U](f)(t)
+  }
 
   abstract class Grammar[+T] {
 
@@ -23,7 +46,7 @@ trait Grammars {
      * right-associative append is better?
      */
     def ~[U](that: Grammar[U]): Grammar[T ~ U] = Concat(this, that)
-    def rep: Grammar[FoldGrammar[T]] = Repeat(fromGrammar(this))
+    def rep: Grammar[Foldable[T, Id]] = Repeat(this)
     def map[U](f: T => U): Grammar[U] = Mapped(this, f)
     def |[U >: T](that: Grammar[U]): Grammar[U] = Or(this, that)
   }
@@ -35,7 +58,7 @@ trait Grammars {
 
   case class RFold[T, R](g: Grammar[T])(z: R, comb: (R, T) => R)
     extends Grammar[R]
-  case class Repeat[T](fg: FoldGrammar[T]) extends Grammar[FoldGrammar[T]]
+  case class Repeat[T](g: Grammar[T]) extends Grammar[Foldable[T, Id]]
 
   case class Mapped[T, U](g: Grammar[T], f: T => U) extends Grammar[U]
 
@@ -64,13 +87,11 @@ trait Grammars {
        * A `map` over a `rep` parser
        * [[ rep(a) map f ]] ==> [[ repFold(a)(z)(f) ]]
        */
-      case Repeat(gInner) => m.f match {
-        case fgf: FGFold[_, T] => gInner.fold(fgf.z, fgf.comb)
-        case fg2fg: FG2FG[_, _] => Repeat(fg2fg.f(gInner))
-        case _ => g
-      }
-
-
+//      case Repeat(gInner) => m.f match {
+//        case fgf: FoldableFolded[_, _, _ ,Id] =>
+//          fgf.f(fromGrammar(transform(g))).fold(fgf.z, fgf.comb)
+//        case _ => g
+//      }
 
       case _ => g
     }
@@ -95,17 +116,17 @@ trait Grammars {
   /**
    * Just the usual fold grammar
    */
-  abstract class FoldGrammar[+T] { self =>
+  abstract class Foldable[+T, F[_]: Mappable] { self =>
 
-    def fold[R](z: R, combine: Combine[T, R]): Grammar[R]
+    def fold[R](z: R, combine: Combine[T, R]): F[R]
 
     /**
      * map. Pretty nice, cause we can forward the map
      * function over to the underlying parser, it's exactly
      * the same!
      */
-    def map[U](f: T => U) = new FoldGrammar[U] {
-      def fold[R](z: R, combine: Combine[U, R]): Grammar[R] = self.fold(
+    def map[U](f: T => U) = new Foldable[U, F] {
+      def fold[R](z: R, combine: Combine[U, R]): F[R] = self.fold(
         z,
         (acc: R, elem: T) => combine(acc, f(elem))
       )
@@ -114,7 +135,7 @@ trait Grammars {
     /**
      * filter
      */
-    def filter(p: T => Boolean) = new FoldGrammar[T] {
+    def filter(p: T => Boolean) = new Foldable[T, F] {
       def fold[R](z: R, comb: Combine[T, R]) = self.fold(
         z,
         (acc: R, elem: T) => if (p(elem)) comb(acc, elem) else acc
@@ -125,7 +146,7 @@ trait Grammars {
      * flatMap. It is unclear what semantics this should have for now
      * let's implement it later
      */
-    /*def flatMap[U](f: T => CPSList[U, R]) = new FoldGrammar[U, R] {
+    /*def flatMap[U](f: T => CPSList[U, R]) = new Foldable[U, R] {
 
       def fold(z: R, comb: Combine[U, R]) = self.fold(
         z,
@@ -143,7 +164,7 @@ trait Grammars {
      *
      * see the following related post: http://manojo.github.io/2015/03/03/staged-foldleft-partition/
      */
-    def partition(p: T => Boolean): (FoldGrammar[T], FoldGrammar[T]) = {
+    def partition(p: T => Boolean): (Foldable[T, F], Foldable[T, F]) = {
       val trues = this filter p
       val falses = this filter (a => !p(a))
       (trues, falses)
@@ -167,55 +188,41 @@ trait Grammars {
      * can be rewritten using `map`.
      * see the following related post: http://manojo.github.io/2015/03/12/staged-foldleft-groupby/
      */
-    def groupWith[K](f: T => K): FoldGrammar[(K, T)] =
+    def groupWith[K](f: T => K): Foldable[(K, T), F] =
       this map (elem => (f(elem), elem))
 
     /**
      * utility functions that make it easier to write fold-like functions
      */
-    def toListGrammar: Grammar[List[T]] = {
+    def toListF[U >: T]: F[List[U]] = {
       import scala.collection.mutable.ListBuffer
-      self.fold[ListBuffer[T]](
-        ListBuffer.empty[T],
-        (acc: ListBuffer[T], t: T) => acc :+ t
-      ).map(_.toList)
+      val folded: F[ListBuffer[U]] = self.fold[ListBuffer[U]](
+        ListBuffer.empty[U],
+        (acc: ListBuffer[U], t: U) => acc :+ t
+      )
+      folded map (_.toList)
     }
 
-    def toSkipper: Grammar[Unit] = self.fold((), (acc: Unit, _) => acc)
-    def toLength: Grammar[Int] = self.fold(0, (acc: Int, _) => acc + 1)
+    def toSkipper: F[Unit] = self.fold((), (acc: Unit, _) => acc)
+    def toLength: F[Int] = self.fold(0, (acc: Int, _) => acc + 1)
 
   }
-
-  def fromGrammar[T](g: Grammar[T]): FoldGrammar[T] = new FoldGrammar[T] {
-    def fold[R](z: R, combine: Combine[T, R]): Grammar[R] = RFold(g)(z, combine) /*{ in =>
-
-      @tailrec
-      def loop(curIn: Input, curRes: R): ParseResult[R] = parser(curIn) match {
-        case Success(res, rest) => loop(rest, combine(curRes, res))
-
-        /**
-         * The rest is where we started failing
-         */
-        case Failure(_, _) => Success(curRes, curIn)
-      }
-
-      loop(in, z)
-    }*/
+  def fromGrammar[T](g: Grammar[T]): Foldable[T, Grammar] = new Foldable[T, Grammar] {
+    def fold[R](z: R, combine: Combine[T, R]): Grammar[R] = RFold(g)(z, combine)
   }
 
-  case class FGFold[-T, R](z: R, comb: (R, T) => R)
-      extends Function1[FoldGrammar[T], R] {
-    // A DUMMY FUNCTION!!!!!
-    def apply(f: FoldGrammar[T]) = ??? //f.fold(z, comb)
-  }
-
-  case class FG2FG[T, U](f: FoldGrammar[T] => FoldGrammar[U])
-      extends Function1[FoldGrammar[T], FoldGrammar[U]] {
-
-    def apply(fg: FoldGrammar[T]) = f(fg)
+  /**
+   * a function of the form fs: Foldable[T, Id] => f(fs).fold(z, combine)
+   */
+  case class FoldableFolded[T, U, R, F[_]](
+      f: Foldable[T, F] => Foldable[U, F],
+      z: R, comb: (R, U) => R) extends Function1[Foldable[T, F], F[R]] {
+    def apply(fs: Foldable[T, F]) = f(fs).fold(z, comb)
   }
 
 }
+
+
 
 object HelloGrammars extends Grammars {
 
@@ -242,12 +249,12 @@ object HelloGrammars extends Grammars {
 
     println(g)
     println(transform(g))
-
+/*
     val repG: G[Int ~ Int ~ Int] = (g1 ~ g2.rep ~ g3) map (
       IndepTupleFunction(
         IndepTupleFunction(
           (i: Int) => i + 1,
-          FGFold[Char, Int](0, (acc, e) => acc + 1)
+          FGFold[Char, Int, Id](0, (acc, e) => acc + 1)
         ),
         (i: Int) => i + 5
       )
@@ -255,9 +262,9 @@ object HelloGrammars extends Grammars {
 
     println(repG)
     println(transform(repG))
-
-
-    val repG2: G[Int ~ FoldGrammar[Char] ~ Int] = (g1 ~ g2.rep ~ g3) map (
+*/
+/*
+    val repG2: G[Int ~ Foldable[Char] ~ Int] = (g1 ~ g2.rep ~ g3) map (
       IndepTupleFunction(
         IndepTupleFunction(
           (i: Int) => i + 1,
@@ -269,6 +276,6 @@ object HelloGrammars extends Grammars {
 
     println(repG2)
     println(transform(repG2))
-
+*/
   }
 }
