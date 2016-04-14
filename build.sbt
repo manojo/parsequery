@@ -13,6 +13,7 @@ lazy val basic = Project(
     scalaVersion := "2.11.7",
     scalacOptions ++= Seq(
       "-Xlint",
+      "-Xlog-implicits",
       "-deprecation",
       "-feature",
       "-language:higherKinds",
