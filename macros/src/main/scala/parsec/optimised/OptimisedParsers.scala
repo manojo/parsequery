@@ -89,7 +89,7 @@ class OptimisedParsersImpl(val c: Context) {
        * for now we return only the last statement
        * aka we assume only one statement
        */
-      c.typecheck(liftGrammar(grammars.last))
+      liftGrammar(grammars.last)
 
     case _ =>
       println(showCode(parserBlock))
