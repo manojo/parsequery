@@ -28,6 +28,7 @@ trait GrammarTrees {
    */
   implicit val unliftGrammar: Unliftable[Grammar] = Unliftable {
     case q"${subg: Grammar}.map($arg)" => Mapped(subg, arg)
+    case q"$_.acceptIf($f)" => AcceptIf(f)
     case q"$_.accept($arg)" =>
       val temp = TermName(c.freshName("success"))
       AcceptIf(q"($temp: Elem) => $temp == $arg")

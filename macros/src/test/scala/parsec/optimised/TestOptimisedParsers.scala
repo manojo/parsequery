@@ -13,10 +13,14 @@ class OptimisedParserSuite
 
   val myReader = CharReader("oh3hiagain!".toArray)
 
-  val optimisedAccept: Parser[Char] = optimise(accept('o'))
+  test("acceptIf comes back unscathed") {
+    val singleLetter: Parser[Char] = optimise(acceptIf(_ == 'o'))
+    checkSuccess(singleLetter, myReader)(expected = 'o', expectedPos = 1)
+  }
 
   test("accept desugars into acceptIf") {
-    checkSuccess(optimisedAccept, myReader)(expected = 'o', expectedPos = 1)
+    val singleLetter: Parser[Char] = optimise(accept('o'))
+    checkSuccess(singleLetter, myReader)(expected = 'o', expectedPos = 1)
   }
 
 }
