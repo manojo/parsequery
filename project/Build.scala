@@ -7,7 +7,7 @@ object ParsequeryBuild extends Build {
   def commonSettings = Seq(
     version := "0.1-SNAPSHOT",
     scalaVersion := "2.11.8",
-    //scalacOptions := Seq("-optimize"), // <-- slows down compilation drastically
+    scalacOptions := Seq("-deprecation"),
     libraryDependencies ++=  Seq(
       "org.scala-lang" % "scala-compiler"  % scalaVersion.value % "provided",
       "org.scala-lang" % "scala-reflect" % scalaVersion.value
@@ -52,8 +52,8 @@ object ParsequeryBuild extends Build {
   )
 
   lazy val core: Project = Project(
-    id = "Examples",
-    base = file("Examples"),
+    id = "core",
+    base = file("core"),
     dependencies = Seq(macros),
     settings = commonSettings ++ Seq(
       // include the macro classes and resources in the main jar

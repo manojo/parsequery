@@ -9,9 +9,7 @@ trait Reader[+T] {
 }
 
 trait StringReader[+T] extends Reader[T] {
-
   def source: Array[Char]
-
 }
 
 case class CharReader(val source: Array[Char], val pos: Int = 0)
