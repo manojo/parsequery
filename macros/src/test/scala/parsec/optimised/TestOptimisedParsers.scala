@@ -23,4 +23,22 @@ class OptimisedParserSuite
     checkSuccess(singleLetter, myReader)(expected = 'o', expectedPos = 1)
   }
 
+  test("simple blocks with more than a single expression") {
+    val singleLetter: Parser[Char] = optimise {
+      def p = acceptIf(_ == 'o')
+      p
+    }
+
+    /**
+     * should desugar p into `acceptIf`
+     */
+    val singleLetterAccept: Parser[Char] = optimise {
+      def p = accept('o')
+      p
+    }
+
+    checkSuccess(singleLetter, myReader)(expected = 'o', expectedPos = 1)
+    checkSuccess(singleLetterAccept, myReader)(expected = 'o', expectedPos = 1)
+  }
+
 }
