@@ -22,12 +22,17 @@ trait GrammarTrees {
   case class AcceptIf(f: Tree) extends Grammar
   case class Mapped(g: Grammar, f: Tree) extends Grammar
   case class PIdent(name: Ident) extends Grammar
+  case class Concat(l: Grammar, r: Grammar, t: Type) extends Grammar
 
   /**
    * Liftable and unliftable instances of a grammar
    */
   implicit val unliftGrammar: Unliftable[Grammar] = Unliftable {
+    /** combinators */
     case q"${subg: Grammar}.map($arg)" => Mapped(subg, arg)
+    case q"${l:Grammar} ~[${t: Type}] ${r: Grammar}" => Concat(l, r, t)
+
+    /** base parsers */
     case q"$_.acceptIf($f)" => AcceptIf(f)
     case q"$_.accept($arg)" =>
       val temp = TermName(c.freshName("success"))
@@ -40,9 +45,14 @@ trait GrammarTrees {
   }
 
   implicit val liftGrammar: Liftable[Grammar] = Liftable {
+    /** combinators */
     case Mapped(g, f) => q"$g.map($f)"
+    case Concat(l, r, t) => q"$l ~[$t] $r"
+
+    /** base parsers */
     case AcceptIf(f) => q"acceptIf($f)"
     case PIdent(tname) => q"$tname"
+
   }
 
 

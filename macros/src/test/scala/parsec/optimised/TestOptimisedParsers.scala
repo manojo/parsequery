@@ -36,9 +36,20 @@ class OptimisedParserSuite
       def p = accept('o')
       p
     }
-
     checkSuccess(singleLetter, myReader)(expected = 'o', expectedPos = 1)
     checkSuccess(singleLetterAccept, myReader)(expected = 'o', expectedPos = 1)
+  }
+
+  test("concat of accept desugars") {
+    val twoCharParser = optimise {
+      def p = accept('o') ~ accept('h')
+      p
+    }
+
+    checkSuccess(twoCharParser, myReader)(
+      expected = ('o', 'h'),
+      expectedPos = 2
+    )
   }
 
 }

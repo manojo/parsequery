@@ -4,14 +4,14 @@ import parsec.optimised.OptimisedParsers
 
 object Test extends OptimisedParsers {
 
-  val optimisedAccept: Parser[Char] = optimise {
-    def p = acceptIf(_ == 'o')
+  val optimisedParser = optimise {
+    def p = accept('o') ~ accept('h')
     p
   }
 
   def main(args: Array[String]): Unit = {
     println("oh hai!")
     val myReader = CharReader("oh3hiagain!".toArray)
-    println(optimisedAccept(myReader))
+    println(optimisedParser(myReader))
   }
 }
