@@ -32,10 +32,7 @@ class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
    * A data type representing all the information inside
    * an `optimise` block
    */
-  case class ParserBlock(
-    ruleMap: Map[TermName, ParserDecl],
-    finalStmt: Grammar
-  )
+  case class ParserBlock(ruleMap: Map[TermName, ParserDecl], finalStmt: Grammar)
 
   /**
    * Takes a list of statements that represent code that is
