@@ -46,9 +46,61 @@ class OptimisedParserSuite
       p
     }
 
+    val threeCharParser = optimise {
+      def p = accept('o') ~ accept('h') ~ accept('3')
+      p
+    }
+
+    val ignoreLeft = optimise {
+      def p = accept('o') ~> accept('h')
+      p
+    }
+
+    val ignoreRight = optimise {
+      def p = accept('o') <~ accept('h')
+      p
+    }
+
     checkSuccess(twoCharParser, myReader)(
       expected = ('o', 'h'),
       expectedPos = 2
+    )
+
+    checkSuccess(threeCharParser, myReader)(
+      expected = (('o', 'h'), '3'),
+      expectedPos = 3
+    )
+
+    checkSuccess(ignoreLeft, myReader)(
+      expected = ('h'),
+      expectedPos = 2
+    )
+
+    checkSuccess(ignoreRight, myReader)(
+      expected = ('o'),
+      expectedPos = 2
+    )
+  }
+
+  test("or of accept desugars") {
+    val orParser = optimise {
+      def p = accept('o') | accept('i')
+      p
+    }
+
+    val orParser2 = optimise {
+      def p = accept('i') | accept('o')
+      p
+    }
+
+    checkSuccess(orParser, myReader)(
+      expected = ('o'),
+      expectedPos = 1
+    )
+
+    checkSuccess(orParser2, myReader)(
+      expected = ('o'),
+      expectedPos = 1
     )
   }
 

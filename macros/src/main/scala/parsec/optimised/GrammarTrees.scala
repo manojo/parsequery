@@ -19,10 +19,19 @@ trait GrammarTrees {
   val parserType = typeOf[OptimisedParsers#Parser[_]]
 
   abstract class Grammar
-  case class AcceptIf(f: Tree) extends Grammar
+
+  /** combinators */
   case class Mapped(g: Grammar, f: Tree) extends Grammar
-  case class PIdent(name: Ident) extends Grammar
+
   case class Concat(l: Grammar, r: Grammar, t: Type) extends Grammar
+  case class ConcatLeft(l: Grammar, r: Grammar, t: Type) extends Grammar
+  case class ConcatRight(l: Grammar, r: Grammar, t: Type) extends Grammar
+  case class Or(l: Grammar, r: Grammar, t: Type) extends Grammar
+
+  /** base parsers */
+  case class AcceptIf(f: Tree) extends Grammar
+  case class PIdent(name: Ident) extends Grammar
+
 
   /**
    * Liftable and unliftable instances of a grammar
@@ -30,7 +39,10 @@ trait GrammarTrees {
   implicit val unliftGrammar: Unliftable[Grammar] = Unliftable {
     /** combinators */
     case q"${subg: Grammar}.map($arg)" => Mapped(subg, arg)
-    case q"${l:Grammar} ~[${t: Type}] ${r: Grammar}" => Concat(l, r, t)
+    case q"${l: Grammar} ~[${t: Type}] ${r: Grammar}" => Concat(l, r, t)
+    case q"${l: Grammar} <~[${t: Type}] ${r: Grammar}" => ConcatLeft(l, r, t)
+    case q"${l: Grammar} ~>[${t: Type}] ${r: Grammar}" => ConcatRight(l, r, t)
+    case q"${l: Grammar} |[${t: Type}] ${r: Grammar}" => Or(l, r, t)
 
     /** base parsers */
     case q"$_.acceptIf($f)" => AcceptIf(f)
@@ -48,12 +60,13 @@ trait GrammarTrees {
     /** combinators */
     case Mapped(g, f) => q"$g.map($f)"
     case Concat(l, r, t) => q"$l ~[$t] $r"
+    case ConcatLeft(l, r, t) => q"$l <~[$t] $r"
+    case ConcatRight(l, r, t) => q"$l ~>[$t] $r"
+    case Or(l, r, t) => q"$l |[$t] $r"
 
     /** base parsers */
     case AcceptIf(f) => q"acceptIf($f)"
     case PIdent(tname) => q"$tname"
-
   }
-
 
 }
