@@ -104,4 +104,27 @@ class OptimisedParserSuite
     )
   }
 
+  test("rep comes back unscathed") {
+    val wordParser = optimise {
+      def p = rep(letter).map(_.toListF)
+      p
+    }
+
+    val numParser = optimise {
+      def p = rep(digit).map(_.toListF)
+      p
+    }
+
+    checkSuccess(wordParser, myReader)(
+      expected = (List('o', 'h')),
+      expectedPos = 2
+    )
+
+    val numReader = CharReader("12345".toArray)
+    checkSuccess(numParser, numReader)(
+      expected = (List('1', '2', '3', '4', '5')),
+      expectedPos = 5
+    )
+  }
+
 }
