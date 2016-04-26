@@ -70,14 +70,14 @@ class HListParserSpec
     def justTheStringPlease(fp: FoldParser[Char]): Parser[String] =
       fp.toStringParser
 
-    def addtheInts(fp: FoldParser[Int]): Parser[Int] = 
+    def addtheInts(fp: FoldParser[Int]): Parser[Int] =
       fp.fold[Int](0, (acc, x) => acc + x)
 
     def upperCaseTheVowels(fp: FoldParser[Char]): Parser[String] =
       (fp filter isVowel map (_.toUpper)).toStringParser
 
     /* TODO Have a better syntax here? */
-    val fs = (justTheStringPlease _) :: (addtheInts _) :: 
+    val fs = (justTheStringPlease _) :: (addtheInts _) ::
              (upperCaseTheVowels _)  :: HNil
 
     val parser: Parsers = map(repConcats, fs)
@@ -106,11 +106,11 @@ class HListParserSpec
 
     type Person = String :: String :: Int :: HNil
     type Projection = True :: True :: True :: HNil
-    type PersonParser = Parser[String] :: 
+    type PersonParser = Parser[String] ::
       Parser[String] :: Parser[Int] :: HNil
 
     def personParser = mkParser[PersonParser, Projection, Person](
-      skipWs(first <~ comma) :: skipWs(last <~ comma) :: 
+      skipWs(first <~ comma) :: skipWs(last <~ comma) ::
       skipWs(age <~ CRLF)    :: HNil
     )
 
@@ -141,4 +141,3 @@ class HListParserSpec
   }
   */
 }
-
