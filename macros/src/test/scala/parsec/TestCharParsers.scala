@@ -99,7 +99,7 @@ class CharParsersSuite
     val names = """ "Roger", "Rafa", "Nole", "Stan" """.toArray
 
     def nameParser: Parser[List[String]]
-      = repsep(skipWs(stringLiteral), comma).toListParser
+      = repsep(skipWs(stringLiteral), comma) map (_.toListF)
 
     checkSuccess(nameParser, CharReader(names))(
       expected = List("Roger", "Rafa", "Nole", "Stan"),
