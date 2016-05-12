@@ -6,7 +6,7 @@ import scala.annotation.tailrec
  * An alternative implementation of (unstaged) parser combinators
  * based on the usual, but also a bit different for the concatenation
  */
-trait Parsers {
+trait Parsers extends java.io.Serializable {
 
   type Elem
   type Input = Reader[Elem]
@@ -18,7 +18,9 @@ trait Parsers {
    * We will first do it in a slightly untyped fashion.
    */
 
-  abstract class Parser[+T] extends (Input => ParseResult[T]) {
+  abstract class Parser[+T]
+      extends (Input => ParseResult[T])
+      with java.io.Serializable {
 
     /**
      * The flatMap operation
@@ -106,6 +108,11 @@ trait Parsers {
    */
 
   sealed abstract class ParseResult[+T] {
+
+    def isSuccess = this match {
+      case s @ Success(_, _) => true
+      case _ => false
+    }
 
     def map[U](f: T => U): ParseResult[U] = this match {
       case Success(elem, rest) => Success(f(elem), rest)

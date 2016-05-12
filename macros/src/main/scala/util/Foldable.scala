@@ -1,11 +1,12 @@
 package util
 
 import Functors._
+import scala.annotation.tailrec
 
 /**
  * Just the usual fold grammar
  */
-abstract class Foldable[+T, F[_]: Functor] { self =>
+abstract class Foldable[+T, F[_]: Functor] extends java.io.Serializable { self =>
 
   def fold[R](z: R, combine: (R, T) => R): F[R]
 
@@ -83,22 +84,25 @@ abstract class Foldable[+T, F[_]: Functor] { self =>
   /**
    * utility functions that make it easier to write fold-like functions
    */
-  def toListF[U >: T]: F[List[U]] = {
-    import scala.collection.mutable.ListBuffer
+  def toListF[U >: T]: F[List[U]] = toListBufferF map (_.toList)
+  def toMyListF[U >: T]: F[MyList[U]] = toListBufferF map MyList.bufferToMyList
+
+  import scala.collection.mutable.ListBuffer
+  def toListBufferF[U >: T]: F[ListBuffer[U]] = {
     val folded: F[ListBuffer[U]] = self.fold[ListBuffer[U]](
       ListBuffer.empty[U],
-      (acc: ListBuffer[U], t: U) => acc :+ t
+      (acc: ListBuffer[U], t: U) => { acc += t; acc }
     )
-    folded map (_.toList)
+    folded
   }
 
-  def toMyListF[U >: T]: F[MyList[U]] = {
-    import scala.collection.mutable.ListBuffer
-    val folded: F[ListBuffer[U]] = self.fold[ListBuffer[U]](
-      ListBuffer.empty[U],
-      (acc: ListBuffer[U], t: U) => acc :+ t
+  import scala.collection.mutable.ArrayBuffer
+  def toArrayBufferF[U >: T]: F[ArrayBuffer[U]] = {
+    val folded: F[ArrayBuffer[U]] = self.fold[ArrayBuffer[U]](
+      ArrayBuffer.empty[U],
+      (acc: ArrayBuffer[U], t: U) => { acc += t; acc }
     )
-    folded map MyList.bufferToMyList
+    folded
   }
 
   def toSkipper: F[Unit] = self.fold((), (acc: Unit, _) => acc)
@@ -111,10 +115,14 @@ abstract class Foldable[+T, F[_]: Functor] { self =>
  * carries a more restrictive interface, which is helpful
  */
 abstract class MyList[+T] extends Foldable[T, Functors.Id] {
-  def fold[R](z: R, combine: (R, T) => R): R = this match {
-    case Nil => z
-    case Cons(x, xs) =>
-      xs.fold(combine(z, x), combine)
+  def fold[R](z: R, combine: (R, T) => R): R = {
+    @tailrec
+    def loop(acc: R, tmpLs: MyList[T]): R = tmpLs match {
+      case Nil => acc
+      case Cons(x, xs) => loop(combine(acc, x), xs)
+    }
+
+    loop(z, this)
   }
 
   def append[U >: T](elem: U): MyList[U] = this match {

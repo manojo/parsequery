@@ -44,7 +44,7 @@ import util.{Nil => Nil, Cons => Cons}
 
 trait RepetitionParsers extends Parsers {
 
-  implicit object ParserFunctor extends Functor[Parser] {
+  implicit object ParserFunctor extends Functor[Parser] with java.io.Serializable {
     def map[T, U](f: T => U) = (g: Parser[T]) => g map f
   }
 
@@ -57,7 +57,7 @@ trait RepetitionParsers extends Parsers {
   type Combine[T, R] = (R, T) => R
 
   def repFold[T](p: Parser[T]): FoldParser[T] = fromParser(p)
-  def rep[T](p: Parser[T]): Parser[MyList[T]] = repFold(p).toMyListF
+  def rep[T](p: Parser[T]): Parser[List[T]] = repFold(p).toListF
 
   /**
    * repeatedly parses `parser`, interspersed with the `sep` parser
@@ -66,12 +66,14 @@ trait RepetitionParsers extends Parsers {
    * TODO: could `sep` always be a `Parser[Unit]`?
    */
   def repsepFold[T, U](parser: Parser[T], sep: => Parser[U]): FoldParser[T] = {
-    new FoldParser[T] {
+    new FoldParser[T] with java.io.Serializable {
       def fold[R](z: R, combine: Combine[T, R]): Parser[R] = Parser { in =>
+
+        val together = sep ~> parser
 
         /* The loop runs over the composed parser */
         @tailrec
-        def loop(curIn: Input, curRes: R): ParseResult[R] = (sep ~> parser)(curIn) match {
+        def loop(curIn: Input, curRes: R): ParseResult[R] = together(curIn) match {
           case Success(res, rest) => loop(rest, combine(curRes, res))
           /* The rest is where we started failing*/
           case Failure(_, _) => Success(curRes, curIn)
@@ -91,6 +93,43 @@ trait RepetitionParsers extends Parsers {
   def repsep[T, U](parser: Parser[T], sep: => Parser[U]): Parser[MyList[T]] =
     repsepFold(parser, sep).toMyListF
 
+
+  /**
+   * This method should not be used by outsiders
+   */
+  def parseMany[R](ps: List[(Parser[_], Boolean)]): Parser[R] = Parser { in =>
+
+    /**
+     * untyped stuff in here
+     */
+    @tailrec
+    def loop(ls: List[(Parser[_], Boolean)],
+             tmpRes: Any,
+             curIn: Input,
+             replaceLeft: Boolean): ParseResult[Any] = ls match {
+      case collection.immutable.Nil => Success(tmpRes, curIn)
+      case (p, ignore) :: xs => p(curIn) match {
+        case Success(res, rest) =>
+          loop(xs,
+               if (ignore) tmpRes
+               else if (replaceLeft) res
+               else (tmpRes, res),
+               rest,
+               if (replaceLeft) ignore else replaceLeft)
+        case f @ Failure(_, _) => f
+      }
+    }
+
+    /** We know that ps has at least one element */
+    val (p0, ignore) = ps.head
+    p0(in) match {
+      case Success(res, rest) =>
+        loop(ps.tail, res, rest, ignore).asInstanceOf[ParseResult[R]]
+      case f @ Failure(_, _) => f.asInstanceOf[ParseResult[R]]
+    }
+  }
+
+
   /**
    * the repetition parser yields a `R` which is the result type
    * of a `FoldParser`.
@@ -99,7 +138,7 @@ trait RepetitionParsers extends Parsers {
    */
 
   /* create a `FoldParser` given a parser */
-  def fromParser[T](parser: Parser[T]): FoldParser[T] = new FoldParser[T] {
+  def fromParser[T](parser: Parser[T]): FoldParser[T] = new FoldParser[T] with java.io.Serializable {
     def fold[R](z: R, combine: Combine[T, R]): Parser[R] = Parser { in =>
 
       @tailrec
@@ -119,12 +158,12 @@ trait RepetitionParsers extends Parsers {
   /**
    * Just the usual fold parser
    */
-  abstract class FoldParser[+T] extends Foldable[T, Parser]
+  abstract class FoldParser[+T] extends Foldable[T, Parser] with java.io.Serializable
 
   /**
    * ops on folding chars
    */
-  implicit class CharFoldOps(cFold: FoldParser[Char]) {
+  implicit class CharFoldOps(cFold: FoldParser[Char]) extends java.io.Serializable {
 
     def toStringParser: Parser[String] = {
       import scala.collection.mutable.StringBuilder

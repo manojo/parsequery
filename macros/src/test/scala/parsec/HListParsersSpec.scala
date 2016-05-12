@@ -8,8 +8,8 @@ import util.ParserFunSuite
  *  The idea is that each parser lives as a separate tuple */
 class HListParserSpec
     extends ParserFunSuite
-       with HListParsers
-       with CharParsers {
+    with HListParsers
+    with CharParsers {
 
   // Easier to type
   type P[T] = Parser[T]

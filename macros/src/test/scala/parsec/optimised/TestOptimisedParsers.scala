@@ -1,8 +1,7 @@
 package parsec.optimised
 
+import _root_.util.ParserFunSuite
 import parsec._
-
-import util.ParserFunSuite
 
 /**
  * Tests functionality of the `optimise` macro
@@ -106,12 +105,12 @@ class OptimisedParserSuite
 
   test("rep comes back unscathed") {
     val wordParser = optimise {
-      def p = rep(letter).map(_.toListF)
+      def p = rep(letter)
       p
     }
 
     val numParser = optimise {
-      def p = rep(digit).map(_.toListF)
+      def p = rep(digit)
       p
     }
 
@@ -126,5 +125,4 @@ class OptimisedParserSuite
       expectedPos = 5
     )
   }
-
 }
