@@ -1,8 +1,10 @@
 package parsec.optimised
 
 import parsec._
+import util._
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
+import scala.annotation.tailrec
 
 trait OptimisedParsers extends CharParsers {
 
@@ -11,7 +13,9 @@ trait OptimisedParsers extends CharParsers {
 
 }
 
-class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
+class OptimisedParsersImpl(val c: Context)
+    extends StagedGrammars {
+
   import c.universe._
 
   //scalastyle:off line.size.limit
@@ -75,10 +79,31 @@ class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
    */
   def transform(pBlock: ParserBlock): Tree = {
 
-    import scala.collection.mutable.Map
-    val oldToNew: Map[Name, Name] = Map.empty
+    import scala.collection.mutable.{Map => MuMap}
+    val oldToNew: MuMap[Name, Name] = MuMap.empty
 
     val ParserBlock(ruleMap, finalG) = pBlock
+
+    /**
+     * we first stage each parser we see
+     */
+    val stagedParsers: Map[TermName, Option[Parser]] = {
+      for ((name, ParserDecl(_, _, _, g)) <- ruleMap)
+      yield (name -> stage(g))
+    }
+
+    val functionalized: Map[TermName, Option[Tree]] = for ((name, optionP) <- stagedParsers) yield {
+      val inputTerm = TermName(c.freshName("input"))
+      val in = q"$inputTerm"
+      val mapped = optionP map { parser =>
+        println("WHAT IS GOING ON?")
+        println(parser.elemType)
+        q"Parser { ($in: Input) => ${parser(in).toParseResult} }"
+      }
+      (name -> mapped)
+    }
+
+    println(functionalized)
 
     /**
      * for each parser definition in scope we create a new, but identical
@@ -92,12 +117,16 @@ class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
      * Currently we only check the final parser statement of the block.
      */
     val stmts: List[Tree] = (for ((_, ParserDecl(name, tparams, retType, g)) <- ruleMap) yield {
-
-      val tmpParserName = c.freshName(TermName("tmpParserDef"))
+      val TermName(nameString) = name
+      val tmpParserName = c.freshName(TermName(nameString))
       oldToNew += (name -> tmpParserName)
 
-      q"def $tmpParserName[..$tparams]: $retType = $g"
+      functionalized.get(name) match {
+        case Some(Some(parser)) => q"def $tmpParserName[..$tparams]: $retType = $parser"
+        case _            => q"def $tmpParserName[..$tparams]: $retType = $g"
+      }
     }).toList
+
 
     /**
      * rewriting the final grammar in case it refers now to an old

@@ -7,6 +7,7 @@ import scala.reflect.macros.blackbox.Context
  * along with lifting and unlifting for them
  */
 trait GrammarTrees {
+
   val c: Context
   import c.universe._
 
@@ -36,7 +37,7 @@ trait GrammarTrees {
   //case class RepFold(g: Grammar, t: Type)(z: Tree, comb: Tree) extends Grammar
 
   /** base parsers */
-  case class AcceptIf(f: Tree) extends Grammar
+  case class AcceptIf(p: Tree) extends Grammar
   case class PIdent(name: Ident) extends Grammar
 
 
@@ -83,8 +84,7 @@ trait GrammarTrees {
     case Rep(g, t) => q"rep[$t]($g)"
 
     /** base parsers */
-    case AcceptIf(f) => q"acceptIf($f)"
+    case AcceptIf(p) => q"acceptIf($p)"
     case PIdent(tname) => q"$tname"
   }
-
 }
