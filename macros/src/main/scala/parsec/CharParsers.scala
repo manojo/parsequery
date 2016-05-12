@@ -22,23 +22,37 @@ trait CharParsers extends Parsers with RepetitionParsers {
   def number: Parser[Int] =
     repFold(digit2Int).fold[Int](0, (acc, n) => acc * 10 + n)
 
-  def ws = repFold(singleSpace)
-  def ignoreWs = ws.toSkipper
+  def ws = repFold(singleSpace | CRLF)
+  val ignoreWs = ws.toSkipper
 
   /**
    * parses a string passed as a parameter
    * returns the string in question if successful
    */
-  def accept(s: String): Parser[String] = Parser { in =>
+  def accept(s: String): Parser[String] = {
+    val arr = s.toArray
+    Parser { in =>
+      import scala.annotation.tailrec
+      @tailrec
+      def loop(curIn: Input, curIdx: Int): ParseResult[String] = {
+        if (curIn.atEnd) Failure(s"failed to match $s, went out of bounds", in)
+        if (curIdx >= arr.length) Success(s, curIn)
+        else if (curIn.first != arr(curIdx)) Failure(s"failed to match $s", in)
+        else loop(curIn.rest, curIdx + 1)
+      }
+
+      loop(in, 0)
+    }
+  }
+
+  def accept(str: Array[Char]): Parser[Array[Char]] = Parser { in =>
     import scala.annotation.tailrec
 
-    val arr = s.toArray
-
     @tailrec
-    def loop(curIn: Input, curIdx: Int): ParseResult[String] = {
-      if (curIn.atEnd) Failure(s"failed to match $s, went out of bounds", in)
-      if (curIdx >= arr.length) Success(s, curIn)
-      else if (curIn.first != arr(curIdx)) Failure(s"failed to match $s", in)
+    def loop(curIn: Input, curIdx: Int): ParseResult[Array[Char]] = {
+      if (curIn.atEnd) Failure(s"failed to match $str, went out of bounds", in)
+      if (curIdx >= str.length) Success(str, curIn)
+      else if (curIn.first != str(curIdx)) Failure(s"failed to match $str", in)
       else loop(curIn.rest, curIdx + 1)
     }
 
@@ -78,7 +92,10 @@ trait CharParsers extends Parsers with RepetitionParsers {
    * surrounds any parser with a whitespace ignoring parser
    * left and right
    */
-  def skipWs[T](p: Parser[T]): Parser[T] =
-    ignoreWs ~> p <~ ignoreWs
-
+  def skipWs[T](p: Parser[T]): Parser[T] = //ignoreWs ~> p <~ ignoreWs
+    parseMany[T](List(
+      (ignoreWs, true),
+      (p, false),
+      (ignoreWs, true)
+    ))
 }
