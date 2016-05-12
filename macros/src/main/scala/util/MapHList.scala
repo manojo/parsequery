@@ -5,7 +5,7 @@ import ops.hlist._
 
 /**
  * Mapping over a HList
- * This is different from the `map` in shapeless is
+ * This is different from the `map` in shapeless in
  * that we have a very specific function we want to apply
  * to every element. So we must provide an HList of functions
  * `L` is the input list

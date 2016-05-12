@@ -17,12 +17,12 @@ trait CharParsers extends Parsers with RepetitionParsers {
   def comma = accept(',')
   def CRLF = accept('\n')
 
-  def letters = rep(letter)
-  def digits = rep(digit)
+  def letters = repFold(letter)
+  def digits = repFold(digit)
   def number: Parser[Int] =
-    rep(digit2Int).fold[Int](0, (acc, n) => acc * 10 + n)
+    repFold(digit2Int).fold[Int](0, (acc, n) => acc * 10 + n)
 
-  def ws = rep(singleSpace)
+  def ws = repFold(singleSpace)
   def ignoreWs = ws.toSkipper
 
   /**
@@ -71,7 +71,7 @@ trait CharParsers extends Parsers with RepetitionParsers {
    * weird characters include much of unicode (stuff that starts with \\u???)
    */
   def stringLiteral: Parser[String] =
-    accept('\"') ~> rep(acceptIf(_ != '\"')).toStringParser <~ accept('\"')
+    accept('\"') ~> repFold(acceptIf(_ != '\"')).toStringParser <~ accept('\"')
 
 
   /**

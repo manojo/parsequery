@@ -6,9 +6,7 @@ import parsec._
 /**
  * A util class for making it easier to write parser related tests
  */
-class ParserFunSuite
-    extends FunSuite
-    with CharParsers {
+class ParserFunSuite extends FunSuite { self: CharParsers =>
 
   def checkSuccess[T](p: Parser[T], in: Input)
                      (expected: => T, expectedPos: => Int): Unit =
