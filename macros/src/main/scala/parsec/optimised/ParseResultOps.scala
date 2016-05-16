@@ -16,8 +16,45 @@ trait ParseResultOps { self: Zeroval =>
    *   ParseResultCPS[T] =
    *     forall X. (success: (T, Input) => X, failure: (Input) => X) => X
    */
-  abstract class ParseResult(val elemType: Type) {
+  abstract class ParseResult(val elemType: Type) { self =>
     def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree): Tree
+
+    def map(t: Type, f: Tree => Tree) = new ParseResult(t) {
+      /**
+       * we make a join point right away, and avoid all the mess
+       * later
+       */
+      def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree): Tree = {
+        val successTerm = TermName(c.freshName("success"))
+        val isSuccess = q"$successTerm"
+
+        val inputTerm = TermName(c.freshName("in"))
+        val input = q"$inputTerm"
+
+        val tmpResTerm = TermName(c.freshName("tmpRes"))
+        val tmpRes = q"$tmpResTerm"
+
+        val applied = self.apply(
+          (res, rest) => q"""
+            $tmpRes = $res
+            $input = $rest
+            $isSuccess = true
+          """,
+          rest => q"$input = $rest"
+        )
+
+        q"""
+          var $successTerm: Boolean = false
+          var $tmpResTerm: ${self.elemType} = ${zeroValue(elemType)}
+          var $inputTerm: Input = null
+
+          $applied
+
+          if ($isSuccess) ${success(f(tmpRes), input)}
+          else ${failure(input)}
+        """
+      }
+    }
 
     def toParseResult: Tree = {
       /**

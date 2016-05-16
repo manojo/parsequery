@@ -96,14 +96,10 @@ class OptimisedParsersImpl(val c: Context)
       val inputTerm = TermName(c.freshName("input"))
       val in = q"$inputTerm"
       val mapped = optionP map { parser =>
-        println("WHAT IS GOING ON?")
-        println(parser.elemType)
         q"Parser { ($in: Input) => ${parser(in).toParseResult} }"
       }
       (name -> mapped)
     }
-
-    println(functionalized)
 
     /**
      * for each parser definition in scope we create a new, but identical
@@ -147,8 +143,8 @@ class OptimisedParsersImpl(val c: Context)
   }
 
   /**
-   * This method is the macro entry point. TODO: it should be typed
-   * so that it is a c.Expr[Parser[T]].
+   * This method is the macro entry point. TODO: should it be typed
+   * so that it is a c.Expr[Parser[T]]?
    */
   def optimise(parserBlock: c.Tree) = parserBlock match {
     case q"{..$statements}" =>

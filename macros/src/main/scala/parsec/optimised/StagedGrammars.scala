@@ -31,10 +31,15 @@ trait StagedGrammars
     case AcceptIf(p) =>
       Some(acceptIf(realElemType, p))
 
-    //case Rep(g, t) => stage(g) match {
-    //  case Some(f) => Some(fromParser(t, f).toListBuffer)
-    //  case _ => None
-    //}
+    case Rep(g, t) => stage(g) match {
+      case Some(f) => Some(rep(t, f))
+      case _ => None
+    }
+
+//    case Mapped(g, f, t) => stage(g) match {
+//      case Some(p) => Some(p.map(t, f))
+//      case _ => None
+//    }
 
     /**
      * the default case

@@ -12,7 +12,11 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
    * a CPS-encoded implementation of the Parser datatype
    * based on https://github.com/manojo/functadelic/blob/master/src/main/scala/stagedparsec/StagedParsers.scala
    */
-  abstract class Parser(val elemType: Type) extends (Tree => ParseResult)
+  abstract class Parser(val elemType: Type) extends (Tree => ParseResult) { self =>
+    def map(t: Type, f: Tree => Tree) = new Parser(t) {
+      def apply(in: Tree) = self(in).map(t, f)
+    }
+  }
 
   def mkParser(elemType: Type, f: Tree => ParseResult) = new Parser(elemType) {
     def apply(in: Tree) = f(in)
@@ -28,24 +32,35 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
     )
   })
 
+  def rep(elemType: Type, p: Parser): Parser = {
+    val listType = appliedType(typeOf[List[_]], List(elemType))
+    fromParser(elemType, p).toListBuffer.map(listType, lb => toList(lb))
+  }
+
+  /**
+   * a bit of a hack
+   */
+  def toList(lb: Tree): Tree = q"$lb.toList"
 
   /**
    * a `FoldParser` represents a ``late'' repetition parser
    * it eventually yields a parser that folds into a collection
    */
-  abstract class FoldParser(elemType: Type) { self =>
+  abstract class FoldParser(val elemType: Type) { self =>
 
     /**
      * fold creates a Parser[retType]
      */
     def fold(
-      retType: Tree,
+      retType: Type,
       z: Tree,
       combine: (Tree, Tree) => Tree): Parser
 
     def toListBuffer: Parser = {
-      val listBufferType: Tree
-        = tq"scala.collection.mutable.ListBuffer[$elemType]"
+      val listBufferType
+        = appliedType(typeOf[scala.collection.mutable.ListBuffer[_]], List(elemType))
+//        c.typecheck(tq"scala.collection.mutable.ListBuffer[$elemType]",
+//          c.TYPEmode).tpe
 
       val folded = self.fold(
         listBufferType,
@@ -55,51 +70,52 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
       folded
     }
   }
-/*
-  def fromParser(elemType: Type, parser: Tree => Tree) = new FoldParser(elemType) {
+
+  def fromParser(elemType: Type, parser: Parser) = new FoldParser(elemType) {
     def fold(
-        retType: Tree,
+        retType: Type,
         z: Tree,
         combine: (Tree, Tree) => Tree): Parser = {
 
       val accTerm = TermName(c.freshName("acc"))
       val acc = q"$accTerm"
 
-      val tmpRes = TermName(c.freshName("tmpRes"))
-      val innerRes = TermName(c.freshName("innerRes"))
+      val successTerm = TermName(c.freshName("success"))
+      val isSuccess = q"$successTerm"
 
       val tmpInTerm = TermName(c.freshName("in"))
       val tmpIn = q"$tmpInTerm"
 
       val resTerm = TermName(c.freshName("res"))
       val res = q"resTerm"
-      val rest = TermName(c.freshName("rest"))
 
-      println("Elem type is")
-      println(elemType =:= typeOf[scala.Char])
-
-      mkParser(retType, { in => {
-        q"""
-        var $accTerm: $retType = $z
-        var $tmpInTerm = $in
-
-        var $tmpRes: ParseResult[$elemType]
-          = Success(${zeroValue(elemType)}, $tmpInTerm)
-
-        while ($tmpRes.isSuccess) {
-          val $innerRes = ${parser(tmpIn)}
-          if ($innerRes.isSuccess) {
-            val Success($res, $rest) = $innerRes
-            $acc = ${combine(acc, res)}
+      val applied = parser(tmpIn).apply(
+        (innerRes, rest) =>
+          q"""
+            $acc = ${combine(acc, innerRes)}
             $tmpIn = $rest
-          }
-          $tmpRes = $innerRes
-        }
+          """,
+        (rest) => q"$isSuccess = false"
+      )
 
-        Success($acc, $tmpIn)
+      mkParser(retType, { in => new ParseResult(retType) {
+
+        /**
+         * we know in this case that we have a success, so
+         * we'll hard-code the calling of the success continuation
+         */
+        def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = q"""
+          var $accTerm: $retType = $z
+          var $tmpInTerm = $in
+          var $successTerm: Boolean = true
+
+          while ($isSuccess) {
+            $applied
+          }
+          ${success(acc, tmpIn)}
+
         """
       }})
     }
   }
-  */
 }
