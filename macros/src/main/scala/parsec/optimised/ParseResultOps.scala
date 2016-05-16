@@ -45,7 +45,7 @@ trait ParseResultOps { self: Zeroval =>
 
         q"""
           var $successTerm: Boolean = false
-          var $tmpResTerm: ${self.elemType} = ${zeroValue(elemType)}
+          var $tmpResTerm: ${self.elemType} = ${zeroValue(self.elemType)}
           var $inputTerm: Input = null
 
           $applied
@@ -53,6 +53,41 @@ trait ParseResultOps { self: Zeroval =>
           if ($isSuccess) ${success(f(tmpRes), input)}
           else ${failure(input)}
         """
+      }
+    }
+
+    def flatMapWithNext(t: Type, f: Tree => Tree => ParseResult) =  {
+      new ParseResult(t) {
+        def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+          val successTerm = TermName(c.freshName("success"))
+          val isSuccess = q"$successTerm"
+
+          val inputTerm = TermName(c.freshName("in"))
+          val input = q"$inputTerm"
+
+          val tmpResTerm = TermName(c.freshName("tmpRes"))
+          val tmpRes = q"$tmpResTerm"
+
+          val applied = self.apply(
+            (res, rest) => q"""
+              $tmpRes = $res
+              $input = $rest
+              $isSuccess = true
+            """,
+            rest => q"$input = $rest"
+          )
+
+          q"""
+            var $successTerm: Boolean = false
+            var $tmpResTerm: ${self.elemType} = ${zeroValue(self.elemType)}
+            var $inputTerm: Input = null
+
+            $applied
+
+            if ($isSuccess) ${f(tmpRes)(input).apply(success, failure)}
+            else ${failure(input)}
+          """
+        }
       }
     }
 

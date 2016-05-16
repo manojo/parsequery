@@ -12,10 +12,32 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
    * a CPS-encoded implementation of the Parser datatype
    * based on https://github.com/manojo/functadelic/blob/master/src/main/scala/stagedparsec/StagedParsers.scala
    */
-  abstract class Parser(val elemType: Type) extends (Tree => ParseResult) { self =>
-    def map(t: Type, f: Tree => Tree) = new Parser(t) {
-      def apply(in: Tree) = self(in).map(t, f)
+  abstract class Parser(val elemType: Type) extends (Tree => ParseResult) {
+    def map(t: Type, f: Tree => Tree) = mkParser(t, { in =>
+      this(in).map(t, f)
+    })
+
+    def flatMap(t: Type, f: Tree => Parser) = mkParser(t, { in =>
+      this(in).flatMapWithNext(t, elem => in => f(elem)(in))
+    })
+
+    def ~(that: Parser) = {
+      val pairType
+        = appliedType(typeOf[Tuple2[_, _]], List(elemType, that.elemType))
+
+      this.flatMap(pairType, { l =>
+        that.map(pairType, r => q"($l, $r)")
+      })
     }
+
+    def <~(that: Parser) = this.flatMap(elemType, { l =>
+      that.map(elemType, _ => l)
+    })
+
+    def ~>(that: Parser) = this.flatMap(that.elemType, { _ =>
+      that.map(that.elemType, r => r)
+    })
+
   }
 
   def mkParser(elemType: Type, f: Tree => ParseResult) = new Parser(elemType) {
@@ -34,13 +56,8 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
 
   def rep(elemType: Type, p: Parser): Parser = {
     val listType = appliedType(typeOf[List[_]], List(elemType))
-    fromParser(elemType, p).toListBuffer.map(listType, lb => toList(lb))
+    fromParser(elemType, p).toListBuffer.map(listType, lb => q"$lb.toList")
   }
-
-  /**
-   * a bit of a hack
-   */
-  def toList(lb: Tree): Tree = q"$lb.toList"
 
   /**
    * a `FoldParser` represents a ``late'' repetition parser

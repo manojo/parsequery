@@ -40,7 +40,6 @@ trait GrammarTrees {
   case class AcceptIf(p: Tree) extends Grammar
   case class PIdent(name: Ident) extends Grammar
 
-
   /**
    * Liftable and unliftable instances of a grammar
    */

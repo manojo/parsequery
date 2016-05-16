@@ -28,13 +28,25 @@ trait StagedGrammars
    *
    */
   def stage(g: Grammar): Option[Parser] = g match {
-    case AcceptIf(p) =>
-      Some(acceptIf(realElemType, p))
+    case AcceptIf(p) => Some(acceptIf(realElemType, p))
 
-    case Rep(g, t) => stage(g) match {
-      case Some(f) => Some(rep(t, f))
-      case _ => None
-    }
+    case Rep(g, t) => for (f <- stage(g)) yield rep(t, f)
+
+    case Concat(l, r, t) => for {
+      lp <- stage(l)
+      rp <- stage(r)
+    } yield (lp ~ rp)
+
+    case ConcatLeft(l, r, t) => for {
+      lp <- stage(l)
+      rp <- stage(r)
+    } yield (lp <~ rp)
+
+    case ConcatRight(l, r, t) => for {
+      lp <- stage(l)
+      rp <- stage(r)
+    } yield (lp ~> rp)
+
 
 //    case Mapped(g, f, t) => stage(g) match {
 //      case Some(p) => Some(p.map(t, f))
