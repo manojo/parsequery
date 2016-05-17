@@ -44,7 +44,7 @@ object Test extends OptimisedParsers {
   ))
 
   val simpleParser = optimise {
-    def p = rep(acceptIf(_ == 'o')) ~ accept('h')
+    def p = accept("ooo") ~ rep(acceptIf(_ == 'o')) ~ accept('h')
     p
   }
 

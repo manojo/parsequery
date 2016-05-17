@@ -29,6 +29,7 @@ trait StagedGrammars
    */
   def stage(g: Grammar): Option[Parser] = g match {
     case AcceptIf(p) => Some(acceptIf(realElemType, p))
+    case AcceptStr(s) => Some(acceptStr(s))
 
     case Rep(g, t) => for (f <- stage(g)) yield rep(t, f)
 
@@ -46,7 +47,6 @@ trait StagedGrammars
       lp <- stage(l)
       rp <- stage(r)
     } yield (lp ~> rp)
-
 
 //    case Mapped(g, f, t) => stage(g) match {
 //      case Some(p) => Some(p.map(t, f))

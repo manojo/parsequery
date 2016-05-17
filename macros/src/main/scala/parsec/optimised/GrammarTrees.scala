@@ -38,6 +38,7 @@ trait GrammarTrees {
 
   /** base parsers */
   case class AcceptIf(p: Tree) extends Grammar
+  case class AcceptStr(s: String) extends Grammar
   case class PIdent(name: Ident) extends Grammar
 
   /**
@@ -54,9 +55,19 @@ trait GrammarTrees {
 
     /** base parsers */
     case q"$_.acceptIf($f)" => AcceptIf(f)
-    case q"$_.accept($arg)" =>
+
+    /**
+     * we have many variants of the accept combinator
+     */
+    case q"$_.accept(${arg: Char})" =>
       val temp = TermName(c.freshName("temp"))
       AcceptIf(q"($temp: Elem) => $temp == $arg")
+
+    case q"$_.accept(${arg: String})" => AcceptStr(arg)
+
+//    case q"$_.accept($arg)" if (arg.tpe <:< typeOf[java.lang.String]) =>
+//      println("we deh here nah")
+//
 
     case q"$_.letter" =>
       val temp = TermName(c.freshName("temp"))
@@ -84,6 +95,7 @@ trait GrammarTrees {
 
     /** base parsers */
     case AcceptIf(p) => q"acceptIf($p)"
+    case AcceptStr(s) => q"accept($s)"
     case PIdent(tname) => q"$tname"
   }
 }

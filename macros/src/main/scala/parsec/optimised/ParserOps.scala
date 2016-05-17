@@ -59,6 +59,48 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
     fromParser(elemType, p).toListBuffer.map(listType, lb => q"$lb.toList")
   }
 
+  def acceptStr(s: String): Parser = {
+    val strLen = s.length
+
+    mkParser(typeOf[String], { in => new ParseResult(typeOf[String]) {
+      def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+        val strArrTerm = TermName(c.freshName("strArr"))
+        val strArr = q"$strArrTerm"
+
+        val curIdxTerm = TermName(c.freshName("curIdx"))
+        val curIdx = q"$curIdxTerm"
+
+        val curInTerm = TermName(c.freshName("curIn"))
+        val curIn = q"$curInTerm"
+
+        val continueTerm = TermName(c.freshName("continue"))
+        val continue = q"$continueTerm"
+
+        val successTerm = TermName(c.freshName("success"))
+        val isSuccess = q"$successTerm"
+
+        q"""
+          val $strArrTerm: Array[Char] = $s.toArray
+          var $curIdxTerm: Int = 0
+          var $curInTerm: Input = $in
+          var $continueTerm: Boolean = true
+          var $successTerm: Boolean = false
+
+          while ($continue) {
+            if ($curIn.atEnd) { $continue = false }
+            else if ($curIdx >= $strLen) { $continue = false; $isSuccess = true }
+            else if ($curIn.first != $strArr($curIdx)) { $continue = false }
+            else { $curIdx += 1; $curIn = $curIn.rest }
+          }
+
+          if ($isSuccess) ${success(q"$s", curIn)}
+          else ${failure(in)}
+
+        """
+      }
+    }})
+  }
+
   /**
    * a `FoldParser` represents a ``late'' repetition parser
    * it eventually yields a parser that folds into a collection
