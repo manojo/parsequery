@@ -33,18 +33,19 @@ object TestFastParse {
 
 object Test extends OptimisedParsers {
 
-  val bool = accept("true".toArray) | accept("false".toArray)
-  val skipped = skipWs(comma)
+//  val bool = accept("true".toArray) | accept("false".toArray)
+//  val skipped = skipWs(comma)
 
-  import scala.collection.mutable.ArrayBuffer
-  val manyBools = parseMany[ArrayBuffer[String]](List(
-    (accept('['), true),
-    (repsepFold(bool, skipped).toArrayBufferF, false),
-    (accept(']'), true)
-  ))
+//  import scala.collection.mutable.ArrayBuffer
+//  val manyBools = parseMany[ArrayBuffer[String]](List(
+//    (accept('['), true),
+//    (repsepFold(bool, skipped).toArrayBufferF, false),
+//    (accept(']'), true)
+//  ))
 
   val simpleParser = optimise {
-    def p = accept("ooo") ~ rep(acceptIf(_ == 'o')) ~ accept('h')
+    def p = //(accept("true") | accept("false"))
+      accept('o') | accept('h')//
     p
   }
 

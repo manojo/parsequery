@@ -25,8 +25,8 @@ trait ParseResultOps { self: Zeroval =>
        * later
        */
       def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree): Tree = {
-        val successTerm = TermName(c.freshName("success"))
-        val isSuccess = q"$successTerm"
+        val isSuccessTerm = TermName(c.freshName("success"))
+        val isSuccess = q"$isSuccessTerm"
 
         val inputTerm = TermName(c.freshName("in"))
         val input = q"$inputTerm"
@@ -44,7 +44,7 @@ trait ParseResultOps { self: Zeroval =>
         )
 
         q"""
-          var $successTerm: Boolean = false
+          var $isSuccessTerm: Boolean = false
           var $tmpResTerm: ${self.elemType} = ${zeroValue(self.elemType)}
           var $inputTerm: Input = null
 
@@ -59,8 +59,8 @@ trait ParseResultOps { self: Zeroval =>
     def flatMapWithNext(t: Type, f: Tree => Tree => ParseResult) =  {
       new ParseResult(t) {
         def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
-          val successTerm = TermName(c.freshName("success"))
-          val isSuccess = q"$successTerm"
+          val isSuccessTerm = TermName(c.freshName("success"))
+          val isSuccess = q"$isSuccessTerm"
 
           val inputTerm = TermName(c.freshName("in"))
           val input = q"$inputTerm"
@@ -78,7 +78,7 @@ trait ParseResultOps { self: Zeroval =>
           )
 
           q"""
-            var $successTerm: Boolean = false
+            var $isSuccessTerm: Boolean = false
             var $tmpResTerm: ${self.elemType} = ${zeroValue(self.elemType)}
             var $inputTerm: Input = null
 
@@ -91,13 +91,47 @@ trait ParseResultOps { self: Zeroval =>
       }
     }
 
+    def orElse(t: Type, that: ParseResult) = new ParseResult(t) {
+
+      println("what is this type here?")
+      println(t)
+      println(this.elemType)
+
+      val isSuccessTerm = TermName(c.freshName("success"))
+      val isSuccess = q"$isSuccessTerm"
+
+      val inputTerm = TermName(c.freshName("in"))
+      val input = q"$inputTerm"
+
+      val tmpResTerm = TermName(c.freshName("tmpRes"))
+      val tmpRes = q"$tmpResTerm"
+
+      val applied = self.apply(
+        (res, rest) => q"$isSuccess = true; $tmpRes = $res; $input = $rest",
+        rest => q"()" // we don't need to do anything in this case
+      )
+
+      def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+        q"""
+        var $isSuccessTerm: Boolean = false
+        var $inputTerm: Input = null
+        var $tmpResTerm: ${this.elemType} = ${zeroValue(this.elemType)}
+
+        $applied
+
+        if ($isSuccess) ${success(tmpRes, input)}
+        else ${that.apply(success, failure)}
+        """
+      }
+    }
+
     def toParseResult: Tree = {
       /**
        * A parser returns a CPS-encoded ParseResult,
        * we have to inline it here.
        */
-      val successTerm = TermName(c.freshName("success"))
-      val success = q"$successTerm"
+      val isSuccessTerm = TermName(c.freshName("success"))
+      val success = q"$isSuccessTerm"
 
       val resTerm = TermName(c.freshName("res"))
       val res = q"$resTerm"
@@ -120,7 +154,7 @@ trait ParseResultOps { self: Zeroval =>
 
       val inputType = tq"Input".tpe
       q"""
-        var $successTerm = false
+        var $isSuccessTerm: Boolean = false
         var $resTerm: $elemType = ${zeroValue(elemType)}
         var $inputTerm: Input = null
         $applied

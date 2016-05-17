@@ -48,6 +48,11 @@ trait StagedGrammars
       rp <- stage(r)
     } yield (lp ~> rp)
 
+    case Or(l, r, t) => for {
+      lp <- stage(l)
+      rp <- stage(r)
+    } yield (lp.or(t, rp))
+
 //    case Mapped(g, f, t) => stage(g) match {
 //      case Some(p) => Some(p.map(t, f))
 //      case _ => None

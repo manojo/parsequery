@@ -38,6 +38,9 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
       that.map(that.elemType, r => r)
     })
 
+    def or(t: Type, that: Parser) = mkParser(t, { in =>
+      this(in).orElse(t, that(in))
+    })
   }
 
   def mkParser(elemType: Type, f: Tree => ParseResult) = new Parser(elemType) {
@@ -48,6 +51,16 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
     cond(elemType)(q"$in.atEnd",
       mkFailure(in),
       cond(elemType)(q"${p}($in.first)",
+        mkSuccess(elemType, q"$in.first", q"$in.rest"),
+        mkFailure(in)
+      )
+    )
+  })
+
+  def accept(elemType: Type, c: Char): Parser = mkParser(elemType, { (in) =>
+    cond(elemType)(q"$in.atEnd",
+      mkFailure(in),
+      cond(elemType)(q"$in.first == $c",
         mkSuccess(elemType, q"$in.first", q"$in.rest"),
         mkFailure(in)
       )
@@ -76,15 +89,15 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
         val continueTerm = TermName(c.freshName("continue"))
         val continue = q"$continueTerm"
 
-        val successTerm = TermName(c.freshName("success"))
-        val isSuccess = q"$successTerm"
+        val isSuccessTerm = TermName(c.freshName("success"))
+        val isSuccess = q"$isSuccessTerm"
 
         q"""
           val $strArrTerm: Array[Char] = $s.toArray
           var $curIdxTerm: Int = 0
           var $curInTerm: Input = $in
           var $continueTerm: Boolean = true
-          var $successTerm: Boolean = false
+          var $isSuccessTerm: Boolean = false
 
           while ($continue) {
             if ($curIn.atEnd) { $continue = false }
@@ -139,8 +152,8 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
       val accTerm = TermName(c.freshName("acc"))
       val acc = q"$accTerm"
 
-      val successTerm = TermName(c.freshName("success"))
-      val isSuccess = q"$successTerm"
+      val isSuccessTerm = TermName(c.freshName("success"))
+      val isSuccess = q"$isSuccessTerm"
 
       val tmpInTerm = TermName(c.freshName("in"))
       val tmpIn = q"$tmpInTerm"
@@ -166,7 +179,7 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
         def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = q"""
           var $accTerm: $retType = $z
           var $tmpInTerm = $in
-          var $successTerm: Boolean = true
+          var $isSuccessTerm: Boolean = true
 
           while ($isSuccess) {
             $applied
