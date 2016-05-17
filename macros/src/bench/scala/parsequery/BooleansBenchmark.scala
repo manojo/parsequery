@@ -30,13 +30,13 @@ object BooleansBenchmark extends Bench.Group {
   //  include(new BooleansArrayBenchmark {})
   //}
 
-  //performance of "FastParseBools" in {
-  //  include(new FastParseBooleansBenchmark {})
-  //}
+  performance of "FastParseBools" in {
+    include(new FastParseBooleansBenchmark {})
+  }
 
-  //performance of "HandWrittenBools" in {
-  //  include(new BooleanHandWrittenBenchmark {})
-  //}
+  performance of "HandWrittenBools" in {
+    include(new BooleanHandWrittenBenchmark {})
+  }
 }
 
 trait BooleanHandWrittenBenchmark extends BenchmarkHelper {

@@ -22,3 +22,7 @@ Alternatives tried, for parsing a sequence of booleans:
  - folding into unit: works wonders. 4560 -> 11.25
 
  - moving to a bigger size (6600) and profiling again
+
+ - def ws = repFold(singleSpace | CRLF), if replaced by
+   def ws = repFold(acceptIf(x => x == ' ' || x == '\n')) shaves more time
+   again. Can this be done automatically by staging?
