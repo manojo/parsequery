@@ -47,25 +47,17 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
     def apply(in: Tree) = f(in)
   }
 
-  def acceptIf(elemType: Type, p: Tree): Parser = mkParser(elemType, { (in) =>
+  def acceptIf(elemType: Type, p: Tree => Tree): Parser = mkParser(elemType, { (in) =>
     cond(elemType)(q"$in.atEnd",
       mkFailure(in),
-      cond(elemType)(q"${p}($in.first)",
+      cond(elemType)(q"${p(q"$in.first")}",
         mkSuccess(elemType, q"$in.first", q"$in.rest"),
         mkFailure(in)
       )
     )
   })
 
-  def accept(elemType: Type, c: Char): Parser = mkParser(elemType, { (in) =>
-    cond(elemType)(q"$in.atEnd",
-      mkFailure(in),
-      cond(elemType)(q"$in.first == $c",
-        mkSuccess(elemType, q"$in.first", q"$in.rest"),
-        mkFailure(in)
-      )
-    )
-  })
+  def accept(c: Char) = acceptIf(typeOf[Char], elem => q"$elem == $c")
 
   def rep(elemType: Type, p: Parser): Parser = {
     val listType = appliedType(typeOf[List[_]], List(elemType))

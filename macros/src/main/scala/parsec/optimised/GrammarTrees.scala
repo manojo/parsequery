@@ -34,12 +34,15 @@ trait GrammarTrees {
    * if needed
    */
   case class Rep(g: Grammar, t: Type) extends Grammar
+  case class Repsep(g: Grammar, g2: Grammar, t: Type, u: Type) extends Grammar
   //case class RepFold(g: Grammar, t: Type)(z: Tree, comb: Tree) extends Grammar
 
   /** base parsers */
-  case class AcceptIf(p: Tree) extends Grammar
+  case class AcceptIf(p: Tree => Tree) extends Grammar
   case class AcceptStr(s: String) extends Grammar
   case class PIdent(name: Ident) extends Grammar
+  /* TODO: should desugar this later */
+  case class SkipWs(t: Type, g: Grammar) extends Grammar
 
   /**
    * Liftable and unliftable instances of a grammar
@@ -52,30 +55,18 @@ trait GrammarTrees {
     case q"${l: Grammar} ~>[${t: Type}] ${r: Grammar}" => ConcatRight(l, r, t)
     case q"${l: Grammar} |[${t: Type}] ${r: Grammar}" => Or(l, r, t)
     case q"$_.rep[${t: Type}](${g: Grammar})" => Rep(g, t)
+    case q"$_.repsep[${t: Type}, ${u: Type}](${g: Grammar}, ${sep: Grammar})" =>
+      Repsep(g, sep, t, u)
 
     /** base parsers */
-    case q"$_.acceptIf($f)" => AcceptIf(f)
-
-    /**
-     * we have many variants of the accept combinator
-     */
-    case q"$_.accept(${arg: Char})" =>
-      val temp = TermName(c.freshName("temp"))
-      AcceptIf(q"($temp: Elem) => $temp == $arg")
+    case q"$_.acceptIf($f)" => AcceptIf(elem => q"$f($elem)")
+    case q"$_.accept(${arg: Char})" => AcceptIf(elem => q"$elem == $arg")
+    case q"$_.letter" => AcceptIf(elem => q"$elem.isLetter")
+    case q"$_.digit" => AcceptIf(elem => q"$elem.isDigit")
 
     case q"$_.accept(${arg: String})" => AcceptStr(arg)
 
-//    case q"$_.accept($arg)" if (arg.tpe <:< typeOf[java.lang.String]) =>
-//      println("we deh here nah")
-//
-
-    case q"$_.letter" =>
-      val temp = TermName(c.freshName("temp"))
-      AcceptIf(q"($temp: Elem) => $temp.isLetter")
-
-    case q"$_.digit" =>
-      val temp = TermName(c.freshName("temp"))
-      AcceptIf(q"($temp: Elem) => $temp.isDigit")
+    case q"$_.skipWs[${t: Type}](${g: Grammar})" => SkipWs(t, g)
 
     /**
      * if we find any identifier, we make sure that it conforms to type
@@ -92,10 +83,15 @@ trait GrammarTrees {
     case ConcatRight(l, r, t) => q"$l ~>[$t] $r"
     case Or(l, r, t) => q"$l |[$t] $r"
     case Rep(g, t) => q"rep[$t]($g)"
+    case Repsep(g, sep, t, u) => q"repsep[$t, $u]($g, $sep)"
 
     /** base parsers */
-    case AcceptIf(p) => q"acceptIf($p)"
+    case AcceptIf(p) =>
+      val temp = TermName(c.freshName("temp"))
+      q"acceptIf(($temp: Elem) => ${p(q"$temp")})"
+
     case AcceptStr(s) => q"accept($s)"
     case PIdent(tname) => q"$tname"
+    case SkipWs(t, g) => q"skipWs[$t]($g)"
   }
 }
