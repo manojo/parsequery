@@ -31,6 +31,9 @@ trait StagedGrammars
     case AcceptIf(p) => Some(acceptIf(realElemType, p))
     case AcceptStr(s) => Some(acceptStr(s))
 
+    /** TODO: should this be desugared before showing up here? */
+    case SkipWs(t, g) => for (f <- stage(g)) yield skipWs(f)
+
     case Rep(g, t) => for (f <- stage(g)) yield rep(t, f)
 
     case Concat(l, r, t) => for {
@@ -52,6 +55,11 @@ trait StagedGrammars
       lp <- stage(l)
       rp <- stage(r)
     } yield (lp.or(t, rp))
+
+    case Repsep(g, sep, t, u) => for {
+      lp <- stage(g)
+      rp <- stage(sep)
+    } yield (repsep(lp, rp))
 
 //    case Mapped(g, f, t) => stage(g) match {
 //      case Some(p) => Some(p.map(t, f))

@@ -64,6 +64,46 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
     fromParser(elemType, p).toListBuffer.map(listType, lb => q"$lb.toList")
   }
 
+  def repsep(p: Parser, sep: Parser): Parser = {
+    val foldable = new FoldParser(p.elemType) {
+      def fold(
+          retType: Type,
+          z: Tree,
+          combine: (Tree, Tree) => Tree): Parser = {
+
+        mkParser(retType, { in => new ParseResult(retType) {
+
+          def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+            p(in).apply(
+              /**
+               * if `p` succeeds once, we can repeat `sep ~> p`,
+               * to possibly combine more into it.
+               */
+              (res, rest) => {
+                val tmpAccTerm = TermName(c.freshName("tmpAcc"))
+                val tmpAcc = q"$tmpAccTerm"
+
+                val foldedRest: Parser = fromParser(p.elemType, sep ~> p).fold(
+                  retType,
+                  q"val $tmpAccTerm = $z; ${combine(tmpAcc, res)}",
+                  combine)
+                foldedRest(rest).apply(success, failure)
+              },
+
+              /**
+               * if `p` fails, we can still return the `z` element
+               */
+              rest => success(z, in)
+            )
+          }
+        }})
+      }
+    }
+
+    val listType = appliedType(typeOf[List[_]], List(p.elemType))
+    foldable.toListBuffer.map(listType, lb => q"$lb.toList")
+  }
+
   def acceptStr(s: String): Parser = {
     val strLen = s.length
 
@@ -107,6 +147,16 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
   }
 
   /**
+   * A whitespace parser that folds into unit
+   */
+  def ws = fromParser(
+    typeOf[Char],
+    accept(' ').or(typeOf[Char], accept('\n'))
+  ).toSkipper
+
+  def skipWs(p: Parser) = ws ~> p <~ ws
+
+  /**
    * a `FoldParser` represents a ``late'' repetition parser
    * it eventually yields a parser that folds into a collection
    */
@@ -137,6 +187,15 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
       )
       folded
     }
+
+    /**
+     * folds into unit
+     */
+    def toSkipper: Parser = self.fold(
+      typeOf[scala.Unit],
+      q"()",
+      (acc, elem) => acc
+    )
   }
 
   def fromParser(elemType: Type, parser: Parser) = new FoldParser(elemType) {

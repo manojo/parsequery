@@ -44,8 +44,9 @@ object Test extends OptimisedParsers {
 //  ))
 
   val simpleParser = optimise {
-    def p = //(accept("true") | accept("false"))
-      accept('o') | accept('h')//
+    def p = (accept('[') ~>
+      repsep((accept("true") | accept("false")), skipWs(accept(',')))
+    <~ accept(']'))
     p
   }
 
@@ -55,10 +56,10 @@ object Test extends OptimisedParsers {
     import scala.io.Source
     val fileName = "data/booleans-6600.json"
     val fileContent = Source.fromFile(fileName).mkString
-    val myReader = CharReader("ooohhai".toArray)
+    val myReader = CharReader(fileContent.toArray)
 
     val Success(res, rest) = simpleParser(myReader)
-    println(res)
+    println(res.length)
   }
 
 }
