@@ -120,9 +120,13 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
       z: Tree,
       combine: (Tree, Tree) => Tree): Parser
 
+    /**
+     * folds into a list buffer
+     */
     def toListBuffer: Parser = {
-      val listBufferType
-        = appliedType(typeOf[scala.collection.mutable.ListBuffer[_]], List(elemType))
+      val listBufferType = appliedType(
+        typeOf[scala.collection.mutable.ListBuffer[_]],
+        List(elemType))
 //        c.typecheck(tq"scala.collection.mutable.ListBuffer[$elemType]",
 //          c.TYPEmode).tpe
 

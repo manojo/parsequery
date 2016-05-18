@@ -13,8 +13,7 @@ trait OptimisedParsers extends CharParsers {
 
 }
 
-class OptimisedParsersImpl(val c: Context)
-    extends StagedGrammars {
+class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
 
   import c.universe._
 
@@ -92,13 +91,15 @@ class OptimisedParsersImpl(val c: Context)
       yield (name -> stage(g))
     }
 
-    val functionalized: Map[TermName, Option[Tree]] = for ((name, optionP) <- stagedParsers) yield {
-      val inputTerm = TermName(c.freshName("input"))
-      val in = q"$inputTerm"
-      val mapped = optionP map { parser =>
-        q"Parser { ($in: Input) => ${parser(in).toParseResult} }"
+    val functionalized: Map[TermName, Option[Tree]] = {
+      for ((name, optionP) <- stagedParsers) yield {
+        val inputTerm = TermName(c.freshName("input"))
+        val in = q"$inputTerm"
+        val mapped = optionP map { parser =>
+          q"Parser { ($in: Input) => ${parser(in).toParseResult} }"
+        }
+        (name -> mapped)
       }
-      (name -> mapped)
     }
 
     /**
@@ -112,16 +113,18 @@ class OptimisedParsersImpl(val c: Context)
      *
      * Currently we only check the final parser statement of the block.
      */
-    val stmts: List[Tree] = (for ((_, ParserDecl(name, tparams, retType, g)) <- ruleMap) yield {
-      val TermName(nameString) = name
-      val tmpParserName = c.freshName(TermName(nameString))
-      oldToNew += (name -> tmpParserName)
+    val stmts: List[Tree] = {
+      (for ((_, ParserDecl(name, tparams, retType, g)) <- ruleMap) yield {
+        val TermName(nameString) = name
+        val tmpParserName = c.freshName(TermName(nameString))
+        oldToNew += (name -> tmpParserName)
 
-      functionalized.get(name) match {
-        case Some(Some(parser)) => q"def $tmpParserName[..$tparams]: $retType = $parser"
-        case _            => q"def $tmpParserName[..$tparams]: $retType = $g"
-      }
-    }).toList
+        functionalized.get(name) match {
+          case Some(Some(parser)) => q"def $tmpParserName[..$tparams]: $retType = $parser"
+          case _            => q"def $tmpParserName[..$tparams]: $retType = $g"
+        }
+      }).toList
+    }
 
 
     /**

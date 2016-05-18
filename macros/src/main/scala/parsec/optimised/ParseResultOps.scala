@@ -92,11 +92,6 @@ trait ParseResultOps { self: Zeroval =>
     }
 
     def orElse(t: Type, that: ParseResult) = new ParseResult(t) {
-
-      println("what is this type here?")
-      println(t)
-      println(this.elemType)
-
       val isSuccessTerm = TermName(c.freshName("success"))
       val isSuccess = q"$isSuccessTerm"
 

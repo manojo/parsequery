@@ -98,8 +98,7 @@ class CharParsersSuite
     val justOneName = """ "Roger" """.toArray
     val names = """ "Roger", "Rafa", "Nole", "Stan" """.toArray
 
-    def nameParser: Parser[List[String]]
-      = repsep(skipWs(stringLiteral), comma) map (_.toListF)
+    def nameParser: Parser[List[String]] = repsep(skipWs(stringLiteral), comma)
 
     checkSuccess(nameParser, CharReader(names))(
       expected = List("Roger", "Rafa", "Nole", "Stan"),
