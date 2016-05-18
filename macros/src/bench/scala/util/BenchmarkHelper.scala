@@ -60,7 +60,7 @@ trait BenchmarkHelper extends Bench.ForkedTime with java.io.Serializable {
 
 }
 
-trait ParsequeryBenchmarkHelper extends BenchmarkHelper with CharParsers {
+trait ParsequeryBenchmarkHelper extends BenchmarkHelper with OptimisedParsers {
 
   def runBM(g: Gen[List[String]], mName: String, meth: Parser[_]): Unit = {
     measure method mName in {

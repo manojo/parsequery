@@ -30,6 +30,10 @@ object BooleansBenchmark extends Bench.Group {
   //  include(new BooleansArrayBenchmark {})
   //}
 
+  performance of "optimisedBools" in {
+    include(new BooleansOptimisedBenchmark {})
+  }
+
   performance of "FastParseBools" in {
     include(new FastParseBooleansBenchmark {})
   }
@@ -262,6 +266,21 @@ trait BooleansParseManyBenchmark extends ParsequeryBenchmarkHelper {
     (bools, false),
     (brackClosed, true)
   ))
+
+  performanceOfParsers { f: Gen[List[String]] =>
+    runBM(f, "manyBools", manyBools)
+  }(range)
+}
+
+trait BooleansOptimisedBenchmark extends ParsequeryBenchmarkHelper {
+  import BooleansData._
+
+  val manyBools = optimise {
+    def p = (accept('[') ~>
+      repsep((accept("true") | accept("false")), skipWs(accept(',')))
+    <~ accept(']'))
+    p
+  }
 
   performanceOfParsers { f: Gen[List[String]] =>
     runBM(f, "manyBools", manyBools)
