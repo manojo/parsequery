@@ -35,7 +35,7 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
    * A data type representing all the information inside
    * an `optimise` block
    */
-  case class ParserBlock(ruleMap: Map[TermName, ParserDecl], finalStmt: Grammar)
+  case class ParserBlock(ruleMap: Map[TermName, ParserDecl], finalStmt: PIdent)
 
   /**
    * Takes a list of statements that represent code that is
@@ -68,7 +68,22 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
     }}
 
     val q"${finalG: Grammar}" = finalParser
-    ParserBlock(ruleMap.toMap, finalG)
+
+    /**
+     * we create a "normalised" representation here:
+     * if `finalG` is not named, then we want to stage it
+     * so we create a parser declaration for it, and then
+     * transform that one
+     */
+    val finalExtended: PIdent = finalG match {
+      case p @ PIdent(_) => p
+      case _ =>
+        val finalPName = c.freshName(TermName("finalParser"))
+        ruleMap += (finalPName -> ParserDecl(finalPName, Nil, finalParser.tpe, finalG))
+        PIdent(Ident(finalPName))
+    }
+
+    ParserBlock(ruleMap.toMap, finalExtended)
   }
 
   /**
@@ -84,18 +99,23 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
     val ParserBlock(ruleMap, finalG) = pBlock
 
     /**
-     * we first stage each parser we see
+     * we first stage each parser we see, i.e.
+     * Convert a Parser (Rep[Input => ParseResult]) into
+     * a Rep[Input] => Rep[ParseResult]
      */
     val stagedParsers: Map[TermName, Option[Parser]] = {
       for ((name, ParserDecl(_, _, _, g)) <- ruleMap)
       yield (name -> stage(g))
     }
 
-    val functionalized: Map[TermName, Option[Tree]] = {
+    /**
+     * creating a Parser back!
+     */
+    val functionalised: Map[TermName, Option[Tree]] = {
       for ((name, optionP) <- stagedParsers) yield {
-        val inputTerm = TermName(c.freshName("input"))
-        val in = q"$inputTerm"
         val mapped = optionP map { parser =>
+          val inputTerm = TermName(c.freshName("input"))
+          val in = q"$inputTerm"
           q"Parser { ($in: Input) => ${parser(in).toParseResult} }"
         }
         (name -> mapped)
@@ -115,17 +135,20 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
      */
     val stmts: List[Tree] = {
       (for ((_, ParserDecl(name, tparams, retType, g)) <- ruleMap) yield {
+
+        println("return type")
+        println(retType)
+
         val TermName(nameString) = name
         val tmpParserName = c.freshName(TermName(nameString))
         oldToNew += (name -> tmpParserName)
 
-        functionalized.get(name) match {
+        functionalised.get(name) match {
           case Some(Some(parser)) => q"def $tmpParserName[..$tparams]: $retType = $parser"
           case _            => q"def $tmpParserName[..$tparams]: $retType = $g"
         }
       }).toList
     }
-
 
     /**
      * rewriting the final grammar in case it refers now to an old

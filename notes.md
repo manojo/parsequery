@@ -17,7 +17,8 @@ Alternatives tried, for parsing a sequence of booleans:
  - folding into ArrayBuffer, using += instead of :+ the next order of magnitude
  - but actually, the problem is with the :+ function, which is generic, and
  applies to "immutable" stuff.
- ----> now about fastparse is around 2x faster
+
+ ----> now fastparse is around 2x faster
 
  - folding into unit: works wonders. 4560 -> 11.25
 
@@ -26,3 +27,15 @@ Alternatives tried, for parsing a sequence of booleans:
  - def ws = repFold(singleSpace | CRLF), if replaced by
    def ws = repFold(acceptIf(x => x == ' ' || x == '\n')) shaves more time
    again. Can this be done automatically by staging?
+
+ ---->
+
+  - specialise final parser, even if it ain't named.
+    - since we must return a Parser[T], if the final parser is not named we create
+     a new unnamed parser that we stage and functionalise, and return this name
+     as the final parser.
+    - hence the normalised form of a parser block is to have a collection of parsers
+    ending with a final, named one.
+  - more than one production
+  - json parser <-- check byte size of this guy
+  -

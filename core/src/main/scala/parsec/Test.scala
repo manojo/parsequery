@@ -44,10 +44,9 @@ object Test extends OptimisedParsers {
 //  ))
 
   val simpleParser = optimise {
-    def p = (accept('[') ~>
+    (accept('[') ~>
       repsep((accept("true") | accept("false")), skipWs(accept(',')))
     <~ accept(']'))
-    p
   }
 
   def main(args: Array[String]): Unit = {
