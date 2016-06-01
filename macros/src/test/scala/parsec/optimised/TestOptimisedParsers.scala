@@ -143,4 +143,26 @@ class OptimisedParserSuite
     )
   }
 
+  test("basic recursion works") {
+
+    val listOfAsParser = optimise {
+      def listOfAs: Parser[List[Char]] = (
+        (accept('a') ~ listOfAs).map { case (x, xs) => x :: xs } |
+        success(Nil)
+      )
+      listOfAs
+    }
+
+
+    checkSuccess(listOfAsParser, CharReader("".toArray))(
+      expected = List[Char](),
+      expectedPos = 0
+    )
+
+    checkSuccess(listOfAsParser, CharReader("aaaaa".toArray))(
+      expected = List('a','a','a','a','a'),
+      expectedPos = 5
+    )
+  }
+
 }
