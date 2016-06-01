@@ -31,7 +31,8 @@ class CharParsersSuite
     val zero = CharReader("".toArray)
     val biggerNum = CharReader("12345".toArray)
 
-    checkSuccess(number, zero)(expected = 0, expectedPos = 0)
+    /** an empty string should not be a number */
+    checkFailure(number, zero)
     checkSuccess(number, biggerNum)(expected = 12345, expectedPos = 5)
   }
 
