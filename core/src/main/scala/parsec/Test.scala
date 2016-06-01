@@ -2,16 +2,63 @@ package parsec
 
 import parsec.optimised.OptimisedParsers
 
-object Test extends OptimisedParsers {
+object TestFastParse {
 
-  val optimisedParser = optimise {
-    def p = accept('o') ~ accept('h')
-    p
+  import fastparse.all._
+
+  case class NamedFunction[T, V](f: T => V, name: String) extends (T => V) {
+    def apply(t: T): V = f(t)
+    override def toString(): String = name
   }
+  val Whitespace = NamedFunction(" \r\n".contains(_: Char), "Whitespace")
+  val space = P(CharsWhile(Whitespace).?)
+
+  val `false` = P("false".!)
+  val `true` = P("true".!)
+  val booleans = `true` | `false`
+
+  val manyBools = P("[" ~/ booleans.rep(sep = ",".~/ ~ space) ~ space ~ "]")
 
   def main(args: Array[String]): Unit = {
     println("oh hai!")
-    val myReader = CharReader("oh3hiagain!".toArray)
-    println(optimisedParser(myReader))
+
+    import scala.io.Source
+    val fileName = "data/booleans-6600.json"
+    val fileContent = Source.fromFile(fileName).mkString
+
+    val Parsed.Success(res, rest) = manyBools.parse(fileContent)
+    println(res.length)
   }
+}
+
+object Test extends OptimisedParsers {
+
+//  val bool = accept("true".toArray) | accept("false".toArray)
+//  val skipped = skipWs(comma)
+
+//  import scala.collection.mutable.ArrayBuffer
+//  val manyBools = parseMany[ArrayBuffer[String]](List(
+//    (accept('['), true),
+//    (repsepFold(bool, skipped).toArrayBufferF, false),
+//    (accept(']'), true)
+//  ))
+
+  def simpleParser: Parser[List[Char]] = (
+    (accept('a') ~ simpleParser).map { case (x, xs) => x :: xs } |
+    success(Nil)
+  )
+
+  def main(args: Array[String]): Unit = {
+    println("oh hai!")
+
+    import scala.io.Source
+    val fileName = "data/booleans-6600.json"
+    val fileContent = Source.fromFile(fileName).mkString
+    //val myReader = CharReader(fileContent.toArray)
+    val myReader = CharReader("aaaaa".toArray)
+
+    val Success(res, rest) = simpleParser(myReader)
+    println(res)
+  }
+
 }

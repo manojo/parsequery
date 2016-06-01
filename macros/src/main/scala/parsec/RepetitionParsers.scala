@@ -90,8 +90,8 @@ trait RepetitionParsers extends Parsers {
     }
   }
 
-  def repsep[T, U](parser: Parser[T], sep: => Parser[U]): Parser[MyList[T]] =
-    repsepFold(parser, sep).toMyListF
+  def repsep[T, U](parser: Parser[T], sep: => Parser[U]): Parser[List[T]] =
+    repsepFold(parser, sep).toListF
 
 
   /**

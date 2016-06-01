@@ -98,8 +98,7 @@ class CharParsersSuite
     val justOneName = """ "Roger" """.toArray
     val names = """ "Roger", "Rafa", "Nole", "Stan" """.toArray
 
-    def nameParser: Parser[List[String]]
-      = repsep(skipWs(stringLiteral), comma) map (_.toListF)
+    def nameParser: Parser[List[String]] = repsep(skipWs(stringLiteral), comma)
 
     checkSuccess(nameParser, CharReader(names))(
       expected = List("Roger", "Rafa", "Nole", "Stan"),
@@ -116,5 +115,23 @@ class CharParsersSuite
       expectedPos = justOneName.length
     )
 
+  }
+
+  test("basic recursion works") {
+
+    def listOfAs: Parser[List[Char]] = (
+      (accept('a') ~ listOfAs).map { case (x, xs) => x :: xs } |
+      success(Nil)
+    )
+
+    checkSuccess(listOfAs, CharReader("".toArray))(
+      expected = List[Char](),
+      expectedPos = 0
+    )
+
+    checkSuccess(listOfAs, CharReader("aaaaa".toArray))(
+      expected = List('a','a','a','a','a'),
+      expectedPos = 5
+    )
   }
 }

@@ -1,8 +1,10 @@
 package parsec.optimised
 
 import parsec._
+import util._
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
+import scala.annotation.tailrec
 
 trait OptimisedParsers extends CharParsers {
 
@@ -11,7 +13,8 @@ trait OptimisedParsers extends CharParsers {
 
 }
 
-class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
+class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
+
   import c.universe._
 
   //scalastyle:off line.size.limit
@@ -32,7 +35,7 @@ class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
    * A data type representing all the information inside
    * an `optimise` block
    */
-  case class ParserBlock(ruleMap: Map[TermName, ParserDecl], finalStmt: Grammar)
+  case class ParserBlock(ruleMap: Map[TermName, ParserDecl], finalStmt: PIdent)
 
   /**
    * Takes a list of statements that represent code that is
@@ -65,7 +68,22 @@ class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
     }}
 
     val q"${finalG: Grammar}" = finalParser
-    ParserBlock(ruleMap.toMap, finalG)
+
+    /**
+     * we create a "normalised" representation here:
+     * if `finalG` is not named, then we want to stage it
+     * so we create a parser declaration for it, and then
+     * transform that one
+     */
+    val finalExtended: PIdent = finalG match {
+      case p @ PIdent(_) => p
+      case _ =>
+        val finalPName = c.freshName(TermName("finalParser"))
+        ruleMap += (finalPName -> ParserDecl(finalPName, Nil, finalParser.tpe, finalG))
+        PIdent(Ident(finalPName))
+    }
+
+    ParserBlock(ruleMap.toMap, finalExtended)
   }
 
   /**
@@ -75,10 +93,34 @@ class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
    */
   def transform(pBlock: ParserBlock): Tree = {
 
-    import scala.collection.mutable.Map
-    val oldToNew: Map[Name, Name] = Map.empty
+    import scala.collection.mutable.{Map => MuMap}
+    val oldToNew: MuMap[Name, Name] = MuMap.empty
 
     val ParserBlock(ruleMap, finalG) = pBlock
+
+    /**
+     * we first stage each parser we see, i.e.
+     * Convert a Parser (Rep[Input => ParseResult]) into
+     * a Rep[Input] => Rep[ParseResult]
+     */
+    val stagedParsers: Map[TermName, Option[Parser]] = {
+      for ((name, ParserDecl(_, _, _, g)) <- ruleMap)
+      yield (name -> stage(g))
+    }
+
+    /**
+     * creating a Parser back!
+     */
+    val functionalised: Map[TermName, Option[Tree]] = {
+      for ((name, optionP) <- stagedParsers) yield {
+        val mapped = optionP map { parser =>
+          val inputTerm = TermName(c.freshName("input"))
+          val in = q"$inputTerm"
+          q"Parser { ($in: Input) => ${parser(in).toParseResult} }"
+        }
+        (name -> mapped)
+      }
+    }
 
     /**
      * for each parser definition in scope we create a new, but identical
@@ -91,13 +133,22 @@ class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
      *
      * Currently we only check the final parser statement of the block.
      */
-    val stmts: List[Tree] = (for ((_, ParserDecl(name, tparams, retType, g)) <- ruleMap) yield {
+    val stmts: List[Tree] = {
+      (for ((_, ParserDecl(name, tparams, retType, g)) <- ruleMap) yield {
 
-      val tmpParserName = c.freshName(TermName("tmpParserDef"))
-      oldToNew += (name -> tmpParserName)
+        println("return type")
+        println(retType)
 
-      q"def $tmpParserName[..$tparams]: $retType = $g"
-    }).toList
+        val TermName(nameString) = name
+        val tmpParserName = c.freshName(TermName(nameString))
+        oldToNew += (name -> tmpParserName)
+
+        functionalised.get(name) match {
+          case Some(Some(parser)) => q"def $tmpParserName[..$tparams]: $retType = $parser"
+          case _            => q"def $tmpParserName[..$tparams]: $retType = $g"
+        }
+      }).toList
+    }
 
     /**
      * rewriting the final grammar in case it refers now to an old
@@ -118,8 +169,8 @@ class OptimisedParsersImpl(val c: Context) extends GrammarTrees {
   }
 
   /**
-   * This method is the macro entry point. TODO: it should be typed
-   * so that it is a c.Expr[Parser[T]].
+   * This method is the macro entry point. TODO: should it be typed
+   * so that it is a c.Expr[Parser[T]]?
    */
   def optimise(parserBlock: c.Tree) = parserBlock match {
     case q"{..$statements}" =>
