@@ -97,6 +97,7 @@ trait GrammarTrees {
       q"acceptIf(($temp: Elem) => ${p(q"$temp")})"
 
     case AcceptStr(s) => q"accept($s)"
+    case SuccessGrammar(t, elem) => q"success[$t]($elem)"
     case PIdent(tname) => q"$tname"
     case SkipWs(t, g) => q"skipWs[$t]($g)"
 
