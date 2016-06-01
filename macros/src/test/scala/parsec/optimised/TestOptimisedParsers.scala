@@ -125,4 +125,22 @@ class OptimisedParserSuite
       expectedPos = 5
     )
   }
+
+  test("parsing strings works") {
+
+    val greeting = "  greetings   lion"
+    val greetReader = CharReader(greeting.toArray)
+
+    checkFailure(optimise(accept("greetings")), CharReader("greetin".toArray))
+
+    val greetingsLionParser = optimise {
+      skipWs(accept("greetings")) ~ accept("lion")
+    }
+
+    checkSuccess(greetingsLionParser, greetReader)(
+      expected = ("greetings", "lion"),
+      expectedPos = greeting.length
+    )
+  }
+
 }

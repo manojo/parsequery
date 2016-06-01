@@ -25,4 +25,16 @@ class ParserFunSuite extends FunSuite { self: CharParsers =>
       )
     }
   }
+
+  /**
+   * test succeeds if parsing fails.
+   * TODO: augment with position testing etc.
+   */
+  def checkFailure[T](p: Parser[T], in: Input): Unit = p(in) match {
+    case Success(_, _) => assert(
+      false,
+      "this test supposed to fail, but it succeeded."
+    )
+    case _ => assert(true)
+  }
 }

@@ -29,29 +29,15 @@ trait CharParsers extends Parsers with RepetitionParsers {
    * parses a string passed as a parameter
    * returns the string in question if successful
    */
-  def accept(s: String): Parser[String] = {
-    val arr = s.toArray
-    Parser { in =>
-      import scala.annotation.tailrec
-      @tailrec
-      def loop(curIn: Input, curIdx: Int): ParseResult[String] = {
-        if (curIn.atEnd) Failure(s"failed to match $s, went out of bounds", in)
-        if (curIdx >= arr.length) Success(s, curIn)
-        else if (curIn.first != arr(curIdx)) Failure(s"failed to match $s", in)
-        else loop(curIn.rest, curIdx + 1)
-      }
-
-      loop(in, 0)
-    }
-  }
+  def accept(s: String): Parser[String] = accept(s.toArray).map(_ => s)
 
   def accept(str: Array[Char]): Parser[Array[Char]] = Parser { in =>
     import scala.annotation.tailrec
 
     @tailrec
     def loop(curIn: Input, curIdx: Int): ParseResult[Array[Char]] = {
-      if (curIn.atEnd) Failure(s"failed to match $str, went out of bounds", in)
       if (curIdx >= str.length) Success(str, curIn)
+      else if (curIn.atEnd) Failure(s"failed to match $str, went out of bounds", in)
       else if (curIn.first != str(curIdx)) Failure(s"failed to match $str", in)
       else loop(curIn.rest, curIdx + 1)
     }

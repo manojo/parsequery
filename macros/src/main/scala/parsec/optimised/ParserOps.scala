@@ -132,8 +132,8 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
           var $isSuccessTerm: Boolean = false
 
           while ($continue) {
-            if ($curIn.atEnd) { $continue = false }
-            else if ($curIdx >= $strLen) { $continue = false; $isSuccess = true }
+            if ($curIdx >= $strLen) { $continue = false; $isSuccess = true }
+            else if ($curIn.atEnd) { $continue = false }
             else if ($curIn.first != $strArr($curIdx)) { $continue = false }
             else { $curIdx += 1; $curIn = $curIn.rest }
           }

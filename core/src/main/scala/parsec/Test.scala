@@ -42,22 +42,21 @@ object Test extends OptimisedParsers {
 //    (repsepFold(bool, skipped).toArrayBufferF, false),
 //    (accept(']'), true)
 //  ))
+  val myParser = optimise {
+    accept("greetings")// ~ accept("lion")
+  }
 
-  def simpleParser: Parser[List[Char]] = (
-    (accept('a') ~ simpleParser).map { case (x, xs) => x :: xs } |
-    success(Nil)
-  )
 
   def main(args: Array[String]): Unit = {
-    println("oh hai!")
+    println("greetings liaaon")
 
     import scala.io.Source
     val fileName = "data/booleans-6600.json"
     val fileContent = Source.fromFile(fileName).mkString
     //val myReader = CharReader(fileContent.toArray)
-    val myReader = CharReader("aaaaa".toArray)
+    val myReader = CharReader("greetings".toArray)
 
-    val Success(res, rest) = simpleParser(myReader)
+    val Success(res, rest) = myParser(myReader)
     println(res)
   }
 

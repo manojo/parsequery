@@ -66,6 +66,8 @@ class CharParsersSuite
     val greeting = "greetings lion"
     val greetReader = CharReader(greeting.toArray)
 
+    checkFailure(accept("greetings"), CharReader("greetin".toArray))
+
     checkSuccess(skipWs(accept("greetings")) ~ accept("lion"), greetReader)(
       expected = ("greetings", "lion"),
       expectedPos = greeting.length
