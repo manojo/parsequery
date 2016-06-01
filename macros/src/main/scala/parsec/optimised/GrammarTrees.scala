@@ -41,6 +41,8 @@ trait GrammarTrees {
   case class AcceptIf(p: Tree => Tree) extends Grammar
   case class AcceptStr(s: String) extends Grammar
   case class PIdent(name: Ident) extends Grammar
+  case class SuccessGrammar(t: Type, elem: Tree) extends Grammar
+
   /* TODO: should desugar this later */
   case class SkipWs(t: Type, g: Grammar) extends Grammar
 
@@ -65,6 +67,7 @@ trait GrammarTrees {
     case q"$_.digit" => AcceptIf(elem => q"$elem.isDigit")
 
     case q"$_.accept(${arg: String})" => AcceptStr(arg)
+    case q"$_.success[${t: Type}]($elem)" => SuccessGrammar(t, elem)
 
     case q"$_.skipWs[${t: Type}](${g: Grammar})" => SkipWs(t, g)
 
