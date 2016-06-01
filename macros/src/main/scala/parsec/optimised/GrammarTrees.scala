@@ -42,6 +42,7 @@ trait GrammarTrees {
   case class AcceptStr(s: String) extends Grammar
   case class PIdent(name: Ident) extends Grammar
   case class SuccessGrammar(t: Type, elem: Tree) extends Grammar
+  case object Number extends Grammar
 
   /* TODO: should desugar this later */
   case class SkipWs(t: Type, g: Grammar) extends Grammar
@@ -65,6 +66,7 @@ trait GrammarTrees {
     case q"$_.accept(${arg: Char})" => AcceptIf(elem => q"$elem == $arg")
     case q"$_.letter" => AcceptIf(elem => q"$elem.isLetter")
     case q"$_.digit" => AcceptIf(elem => q"$elem.isDigit")
+    case q"$_.number" => Number
 
     case q"$_.accept(${arg: String})" => AcceptStr(arg)
     case q"$_.success[${t: Type}]($elem)" => SuccessGrammar(t, elem)
@@ -76,6 +78,7 @@ trait GrammarTrees {
      * Parser before making a Grammar AST for it.
      */
     case q"${tname: Ident}" if tname.tpe <:< parserType => PIdent(tname)
+
   }
 
   implicit val liftGrammar: Liftable[Grammar] = Liftable {
@@ -96,5 +99,7 @@ trait GrammarTrees {
     case AcceptStr(s) => q"accept($s)"
     case PIdent(tname) => q"$tname"
     case SkipWs(t, g) => q"skipWs[$t]($g)"
+
+    case Number => q"number"
   }
 }

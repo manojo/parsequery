@@ -153,7 +153,6 @@ class OptimisedParserSuite
       listOfAs
     }
 
-
     checkSuccess(listOfAsParser, CharReader("".toArray))(
       expected = List[Char](),
       expectedPos = 0

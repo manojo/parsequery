@@ -19,8 +19,13 @@ trait CharParsers extends Parsers with RepetitionParsers {
 
   def letters = repFold(letter)
   def digits = repFold(digit)
-  def number: Parser[Int] =
-    repFold(digit2Int).fold[Int](0, (acc, n) => acc * 10 + n)
+
+  /**
+   * at least one digit should match
+   */
+  def number: Parser[Int] = digit2Int flatMap { d =>
+    repFold(digit2Int).fold[Int](d, (acc, n) => acc * 10 + n)
+  }
 
   def ws = repFold(singleSpace | CRLF)
   val ignoreWs = ws.toSkipper

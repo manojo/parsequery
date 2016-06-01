@@ -157,6 +157,19 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
   def skipWs(p: Parser) = ws ~> p <~ ws
 
   /**
+   * other helpful parsers
+   */
+  def digit = acceptIf(typeOf[Char], elem => q"$elem.isDigit")
+  def digit2Int = digit.map(typeOf[Int], elem => q"($elem - '0').toInt")
+  def number = digit2Int.flatMap(typeOf[Int], d =>
+    fromParser(typeOf[Int], digit2Int).fold(
+      typeOf[Int],
+      d,
+      (acc, elem) => q"$acc * 10 + $elem"
+    )
+  )
+
+  /**
    * a `FoldParser` represents a ``late'' repetition parser
    * it eventually yields a parser that folds into a collection
    */
