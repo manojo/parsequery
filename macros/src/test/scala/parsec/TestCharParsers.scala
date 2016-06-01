@@ -116,4 +116,22 @@ class CharParsersSuite
     )
 
   }
+
+  test("basic recursion works") {
+
+    def listOfAs: Parser[List[Char]] = (
+      (accept('a') ~ listOfAs).map { case (x, xs) => x :: xs } |
+      success(Nil)
+    )
+
+    checkSuccess(listOfAs, CharReader("".toArray))(
+      expected = List[Char](),
+      expectedPos = 0
+    )
+
+    checkSuccess(listOfAs, CharReader("aaaaa".toArray))(
+      expected = List('a','a','a','a','a'),
+      expectedPos = 5
+    )
+  }
 }

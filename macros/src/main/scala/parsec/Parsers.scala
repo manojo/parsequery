@@ -32,7 +32,8 @@ trait Parsers extends java.io.Serializable {
     /**
      * The concat operation
      */
-    def ~[U](that: => Parser[U]): Parser[(T, U)] = Seq(this, that)
+    def ~[U](that: => Parser[U]): Parser[(T, U)] =
+      for (l <- this; r <- that) yield (l, r)
 
     /**
      * get right hand side result
@@ -79,6 +80,8 @@ trait Parsers extends java.io.Serializable {
 
   def accept(e: Elem) = acceptIf(_ == e)
 
+  def success[T](t: T): Parser[T] = Parser { in => Success(t, in) }
+
   /**
    * An ADT for parsers
    */
@@ -91,11 +94,11 @@ trait Parsers extends java.io.Serializable {
   }
 
   case class Seq[T, U](l: Parser[T], r: Parser[U]) extends Parser[(T, U)] {
-
+    lazy val bla = r
     /**
      * we just use the composition on parsers directly
      */
-    val inner = for (lRes <- l; rRes <- r) yield (lRes, rRes)
+    lazy val inner = for (lRes <- l; rRes <- bla) yield (lRes, rRes)
     def apply(in: Input) = inner(in)
   }
 
