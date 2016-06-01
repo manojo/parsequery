@@ -61,10 +61,13 @@ trait StagedGrammars
       rp <- stage(sep)
     } yield (repsep(lp, rp))
 
-//    case Mapped(g, f, t) => stage(g) match {
-//      case Some(p) => Some(p.map(t, f))
-//      case _ => None
-//    }
+    /**
+     * The `map` takes a `Tree => Tree` function
+     * The naive `id` transformation involves
+     * eta-expanding. TODO: inline functions which
+     * can be.
+     */
+    case Mapped(g, f, t) => for (p <- stage(g)) yield p.map(t, t => q"$f($t)")
 
     /**
      * the default case
