@@ -34,6 +34,7 @@ trait StagedGrammars
     case SuccessGrammar(t, elem) =>
       Some(mkParser(t, { in => mkSuccess(t, elem, in) }))
     case Number => Some(number)
+    case StringLiteral => Some(stringLiteral)
 
     /** TODO: should this be desugared before showing up here? */
     case SkipWs(t, g) => for (f <- stage(g)) yield skipWs(f)

@@ -143,6 +143,51 @@ class OptimisedParserSuite
     )
   }
 
+  test("parsing string literals works") {
+
+    val emptyStringLit = "\"\"".toArray
+    val aQuote = "\"Dr. Livingstone, I presume?\"".toArray
+
+    val stringLitParser = optimise(stringLiteral)
+
+    checkSuccess(stringLitParser, CharReader(emptyStringLit))(
+      expected = "",
+      expectedPos = emptyStringLit.length
+    )
+
+    checkSuccess(stringLitParser, CharReader(aQuote))(
+      expected = "Dr. Livingstone, I presume?",
+      expectedPos = aQuote.length
+    )
+  }
+
+  test("repsep works") {
+
+    val noNames = "".toArray
+    val justOneName = """ "Roger" """.toArray
+    val names = """ "Roger", "Rafa", "Nole", "Stan" """.toArray
+
+    val nameParser: Parser[List[String]] =
+      optimise(repsep(skipWs(stringLiteral), accept(',')))
+
+    checkSuccess(nameParser, CharReader(names))(
+      expected = List("Roger", "Rafa", "Nole", "Stan"),
+      expectedPos = names.length
+    )
+
+    checkSuccess(nameParser, CharReader(noNames))(
+      expected = List(),
+      expectedPos = noNames.length
+    )
+
+    checkSuccess(nameParser, CharReader(justOneName))(
+      expected = List("Roger"),
+      expectedPos = justOneName.length
+    )
+
+  }
+
+
   test("basic recursion works") {
 
     val listOfAsParser = optimise {

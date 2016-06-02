@@ -169,6 +169,20 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
     )
   )
 
+  def stringLiteral = {
+    import scala.collection.mutable.StringBuilder
+
+    (accept('"') ~>
+      fromParser(
+        typeOf[Char],
+        acceptIf(typeOf[Char], c => q"""$c != '"'""")).fold(
+          typeOf[StringBuilder],
+          q"scala.collection.mutable.StringBuilder.newBuilder",
+          (acc, elem) => q"$acc.append($elem)"
+      )
+    <~ accept('"')).map(typeOf[String], (sbuf => q"$sbuf.toString"))
+  }
+
   /**
    * a `FoldParser` represents a ``late'' repetition parser
    * it eventually yields a parser that folds into a collection
