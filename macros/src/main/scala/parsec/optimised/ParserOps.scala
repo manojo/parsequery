@@ -3,7 +3,16 @@ package parsec.optimised
 import scala.reflect.macros.blackbox.Context
 import util.Zeroval
 
-trait ParserOps { self: ParseResultOps with Zeroval =>
+/**
+ * A staged representation for parsers
+ * Note that we have already specialised the `Elem` type
+ * to be Char here (since we imlpement a lot of char-specific)
+ * parsers
+ *
+ * TODO: when needed, we need to abstract one level more, so as
+ * to specialise as needed.
+ */
+trait ParserOps { self: ParseResultOps with ReaderOps with Zeroval =>
 
   val c: Context
   import c.universe._
@@ -12,7 +21,7 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
    * a CPS-encoded implementation of the Parser datatype
    * based on https://github.com/manojo/functadelic/blob/master/src/main/scala/stagedparsec/StagedParsers.scala
    */
-  abstract class Parser(val elemType: Type) extends (Tree => ParseResult) {
+  abstract class Parser(val elemType: Type) extends (CharReader => ParseResult) {
     def map(t: Type, f: Tree => Tree) = mkParser(t, { in =>
       this(in).map(t, f)
     })
@@ -43,15 +52,15 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
     })
   }
 
-  def mkParser(elemType: Type, f: Tree => ParseResult) = new Parser(elemType) {
-    def apply(in: Tree) = f(in)
+  def mkParser(elemType: Type, f: CharReader => ParseResult) = new Parser(elemType) {
+    def apply(in: CharReader) = f(in)
   }
 
   def acceptIf(elemType: Type, p: Tree => Tree): Parser = mkParser(elemType, { (in) =>
-    cond(elemType)(q"$in.atEnd",
+    cond(elemType)(in.atEnd,
       mkFailure(in),
-      cond(elemType)(q"${p(q"$in.first")}",
-        mkSuccess(elemType, q"$in.first", q"$in.rest"),
+      cond(elemType)(q"${p(in.first)}",
+        mkSuccess(elemType, in.first, in.rest),
         mkFailure(in)
       )
     )
@@ -73,7 +82,7 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
 
         mkParser(retType, { in => new ParseResult(retType) {
 
-          def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+          def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) = {
             p(in).apply(
               /**
                * if `p` succeeds once, we can repeat `sep ~> p`,
@@ -108,15 +117,18 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
     val strLen = s.length
 
     mkParser(typeOf[String], { in => new ParseResult(typeOf[String]) {
-      def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+      def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) = {
         val strArrTerm = TermName(c.freshName("strArr"))
         val strArr = q"$strArrTerm"
 
         val curIdxTerm = TermName(c.freshName("curIdx"))
         val curIdx = q"$curIdxTerm"
 
-        val curInTerm = TermName(c.freshName("curIn"))
-        val curIn = q"$curInTerm"
+        val sourceTerm = TermName(c.freshName("source"))
+        val source = q"$sourceTerm"
+
+        val tmpPosTerm = TermName(c.freshName("tmpPos"))
+        val tmpPos = q"$tmpPosTerm"
 
         val continueTerm = TermName(c.freshName("continue"))
         val continue = q"$continueTerm"
@@ -124,21 +136,25 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
         val isSuccessTerm = TermName(c.freshName("success"))
         val isSuccess = q"$isSuccessTerm"
 
+        val tmpReader = mkCharReader(source, tmpPos)
+        val updatePosition = tmpReader.rest.apply((src, pos) => q"$tmpPos = $pos")
+
         q"""
           val $strArrTerm: Array[Char] = $s.toArray
           var $curIdxTerm: Int = 0
-          var $curInTerm: Input = $in
+          var $sourceTerm: Array[Char] = ${in.getSource}
+          var $tmpPosTerm: Int = ${in.getPos}
           var $continueTerm: Boolean = true
           var $isSuccessTerm: Boolean = false
 
           while ($continue) {
             if ($curIdx >= $strLen) { $continue = false; $isSuccess = true }
-            else if ($curIn.atEnd) { $continue = false }
-            else if ($curIn.first != $strArr($curIdx)) { $continue = false }
-            else { $curIdx += 1; $curIn = $curIn.rest }
+            else if (${tmpReader.atEnd}) { $continue = false }
+            else if (${tmpReader.first} != $strArr($curIdx)) { $continue = false }
+            else { $curIdx += 1; $updatePosition }
           }
 
-          if ($isSuccess) ${success(q"$s", curIn)}
+          if ($isSuccess) ${success(q"$s", tmpReader)}
           else ${failure(in)}
 
         """
@@ -237,18 +253,27 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
       val isSuccessTerm = TermName(c.freshName("success"))
       val isSuccess = q"$isSuccessTerm"
 
-      val tmpInTerm = TermName(c.freshName("in"))
-      val tmpIn = q"$tmpInTerm"
+      val sourceTerm = TermName(c.freshName("source"))
+      val source = q"$sourceTerm"
+
+      val tmpPosTerm = TermName(c.freshName("tmpPos"))
+      val tmpPos = q"$tmpPosTerm"
 
       val resTerm = TermName(c.freshName("res"))
       val res = q"resTerm"
 
-      val applied = parser(tmpIn).apply(
-        (innerRes, rest) =>
+      val applied = parser(mkCharReader(source, tmpPos)).apply(
+        (innerRes, rest) => {
+
+          val readerApplied = rest.apply {
+            (src, pos) => q"$source = $src; $tmpPos = $pos"
+          }
+
           q"""
             $acc = ${combine(acc, innerRes)}
-            $tmpIn = $rest
-          """,
+            $readerApplied
+          """
+        },
         (rest) => q"$isSuccess = false"
       )
 
@@ -258,16 +283,16 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
          * we know in this case that we have a success, so
          * we'll hard-code the calling of the success continuation
          */
-        def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = q"""
+        def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) = q"""
           var $accTerm: $retType = $z
-          var $tmpInTerm = $in
+          var $sourceTerm: Array[Char] = ${in.getSource}
+          var $tmpPosTerm: Int = ${in.getPos}
           var $isSuccessTerm: Boolean = true
 
           while ($isSuccess) {
             $applied
           }
-          ${success(acc, tmpIn)}
-
+          ${success(acc, mkCharReader(source, tmpPos))}
         """
       }})
     }

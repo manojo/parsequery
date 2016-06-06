@@ -131,7 +131,20 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
         val mapped = optionP map { parser =>
           val inputTerm = TermName(c.freshName("input"))
           val in = q"$inputTerm"
-          q"Parser { ($in: Input) => ${parser(in).toParseResult} }"
+
+          val sourceTerm = TermName(c.freshName("source"))
+          val source = q"$sourceTerm"
+
+          val tmpPosTerm = TermName(c.freshName("tmpPos"))
+          val tmpPos = q"$tmpPosTerm"
+
+          q"""Parser { ($in: Input) =>
+            var $sourceTerm: Array[Char] = $in.source
+            var $tmpPosTerm: Int = $in.pos
+
+            ${parser(mkCharReader(source, tmpPos)).toParseResult}
+          }
+          """
         }
         (name -> mapped)
       }

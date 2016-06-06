@@ -22,20 +22,20 @@ object BooleansBenchmark extends Bench.Group {
     include(new BooleansArrayBufferBenchmark {})
   }
 
-  //performance of "booleansANF" in {
-  //  include(new BooleansANFBenchmark {})
-  //}
-
-  //performance of "booleansArray" in {
-  //  include(new BooleansArrayBenchmark {})
-  //}
-
   performance of "optimisedBools" in {
     include(new BooleansOptimisedBenchmark {})
   }
 
+  performance of "optimisedBoolsJSON" in {
+    include(new BooleansJSONBenchmark {})
+  }
+
   performance of "FastParseBools" in {
     include(new FastParseBooleansBenchmark {})
+  }
+
+  performance of "FastParseJSONBools" in {
+    include(new FastParseJSONBooleansBenchmark {})
   }
 
   performance of "HandWrittenBools" in {
@@ -147,6 +147,10 @@ trait BooleanHandWrittenBenchmark extends BenchmarkHelper {
 
 }
 
+/**
+ * The most naive version of a boolean parser
+ * it folds into an immutable list, so extremely inefficient
+ */
 trait BooleansVanillaBenchmark extends ParsequeryBenchmarkHelper {
 
   import BooleansData._
@@ -161,6 +165,9 @@ trait BooleansVanillaBenchmark extends ParsequeryBenchmarkHelper {
   }(range)
 }
 
+/**
+ * Folds booleans into a list buffer
+ */
 trait BooleansListBufferBenchmark extends ParsequeryBenchmarkHelper {
 
   import BooleansData._
@@ -175,6 +182,9 @@ trait BooleansListBufferBenchmark extends ParsequeryBenchmarkHelper {
   }(range)
 }
 
+/**
+ * Folds booleans into an array buffer
+ */
 trait BooleansArrayBufferBenchmark extends ParsequeryBenchmarkHelper {
 
   import BooleansData._
@@ -189,6 +199,9 @@ trait BooleansArrayBufferBenchmark extends ParsequeryBenchmarkHelper {
   }(range)
 }
 
+/**
+ * A recogniser for a list of booleans. Parses the booleans, though
+ */
 trait BooleansUnitBenchmark extends ParsequeryBenchmarkHelper {
   import BooleansData._
 
@@ -202,6 +215,9 @@ trait BooleansUnitBenchmark extends ParsequeryBenchmarkHelper {
   }(range)
 }
 
+/**
+ * a recogniser for a list of booleans. Recognises the booleans
+ */
 trait BooleansRecoUnitBenchmark extends ParsequeryBenchmarkHelper {
   import BooleansData._
 
@@ -215,63 +231,9 @@ trait BooleansRecoUnitBenchmark extends ParsequeryBenchmarkHelper {
   }(range)
 }
 
-trait BooleansArrayBenchmark extends ParsequeryBenchmarkHelper {
-  import BooleansData._
-
-  final val TRUE = "true".toArray
-  final val FALSE = "false".toArray
-
-  def bool = accept(TRUE) | accept(FALSE)
-  def manyBools = (accept('[') ~>
-    repsepFold(bool, skipWs(comma)).toArrayBufferF
-  <~ accept(']'))
-
-  performanceOfParsers { f: Gen[List[String]] =>
-    runBM(f, "manyBools", manyBools)
-  }(range)
-}
-
-trait BooleansANFBenchmark extends ParsequeryBenchmarkHelper {
-  import BooleansData._
-
-  final val TRUE = "true"; final val FALSE = "false"
-
-  val tr = accept(TRUE)
-  val fl = accept(FALSE)
-  val bool = tr | fl
-
-  val brackOpen = accept('[')
-  val c = accept(',')
-  lazy val skipped = skipWs(c)
-  val brackClosed = accept(']')
-  lazy val folded = repsepFold(bool, skipped).toArrayBufferF
-
-  def manyBools = (brackOpen ~> folded <~ brackClosed)
-
-  performanceOfParsers { f: Gen[List[String]] =>
-    runBM(f, "manyBools", manyBools)
-  }(range)
-}
-
-trait BooleansParseManyBenchmark extends ParsequeryBenchmarkHelper {
-  import BooleansData._
-
-  def bool = accept("true") | accept("false")
-  lazy val brackOpen = accept('[')
-  lazy val brackClosed = accept(']')
-  def bools = repsepFold(bool, skipWs(comma)).toArrayBufferF
-
-  def manyBools = parseMany[List[String]](List(
-    (brackOpen, true),
-    (bools, false),
-    (brackClosed, true)
-  ))
-
-  performanceOfParsers { f: Gen[List[String]] =>
-    runBM(f, "manyBools", manyBools)
-  }(range)
-}
-
+/**
+ * uses the `optimise` macro to partially evaluate the parser away
+ */
 trait BooleansOptimisedBenchmark extends ParsequeryBenchmarkHelper {
   import BooleansData._
 
@@ -287,6 +249,56 @@ trait BooleansOptimisedBenchmark extends ParsequeryBenchmarkHelper {
   }(range)
 }
 
+/**
+ * uses the `optimise` macro to partially evaluate the parser away
+ * uses a general json parser rather then a dedicated parser
+ */
+trait BooleansJSONBenchmark extends ParsequeryBenchmarkHelper {
+  import BooleansData._
+
+  sealed abstract class JSValue
+  case class JSObject(dict: List[(String, JSValue)]) extends JSValue
+  case class JSArray(arr: List[JSValue]) extends JSValue
+  case class JSDouble(d: Int) extends JSValue
+  case class JSString(s: String) extends JSValue
+  case class JSBool(b: Boolean) extends JSValue
+  case object JSNull extends JSValue
+
+  val jsonParser = optimise {
+
+    def main: Parser[JSValue] = (
+      obj |
+      arr |
+      stringLiteral.map(x => JSString(x)) |
+      number.map(x => JSDouble(x)) |
+      accept("null").map(_ => JSNull) |
+      accept("true").map(_ => JSBool(true)) |
+      accept("false").map(_ => JSBool(false))
+    )
+
+    def obj: Parser[JSValue] = (skipWs(accept('{')) ~>
+      repsep(member, skipWs(accept(',')))
+    <~ skipWs(accept('}'))) map { x => JSObject(x) }
+
+    def arr: Parser[JSValue] = (skipWs(accept('[')) ~>
+      repsep(main, skipWs(accept(',')))
+    <~ skipWs(accept(']'))) map { x => JSArray(x) }
+
+    def member: Parser[(String, JSValue)] =
+      stringLiteral ~ (skipWs(accept(':')) ~> main)
+
+    main
+  }
+
+  performanceOfParsers { f: Gen[List[String]] =>
+    runBM(f, "manyBools", jsonParser)
+  }(range)
+}
+
+/**
+ * a booleans list parser, written in `FastParse`
+ * aka "the competition"
+ */
 trait FastParseBooleansBenchmark extends FastParseBenchmarkHelper {
   import BooleansData._
   import fastparse.all._
@@ -306,5 +318,69 @@ trait FastParseBooleansBenchmark extends FastParseBenchmarkHelper {
 
   performanceOfParsers { f: Gen[List[String]] =>
     runBM(f, "FastParseBools", manyBools)
+  }(range)
+}
+
+
+/**
+ * a booleans list parser, written in `FastParse`. Also uses a JSON
+ * parser instead of a dedicated bool parser
+ */
+trait FastParseJSONBooleansBenchmark extends FastParseBenchmarkHelper {
+  import BooleansData._
+  import fastparse.all._
+
+  sealed abstract class JSValue
+  case class JSObject(dict: List[(String, JSValue)]) extends JSValue
+  case class JSArray(arr: List[JSValue]) extends JSValue
+  case class JSDouble(d: Double) extends JSValue
+  case class JSString(s: String) extends JSValue
+  case class JSBool(b: Boolean) extends JSValue
+  case object JSNull extends JSValue
+
+  case class NamedFunction[T, V](f: T => V, name: String) extends (T => V) {
+    def apply(t: T): V = f(t)
+    override def toString(): String = name
+  }
+  val Whitespace = NamedFunction(" \r\n".contains(_: Char), "Whitespace")
+  val Digits = NamedFunction('0' to '9' contains (_: Char), "Digits")
+  val StringChars = NamedFunction(!"\"\\".contains(_: Char), "StringChars")
+
+  val space = P(CharsWhile(Whitespace).?)
+  val digits = P(CharsWhile(Digits))
+  val exponent = P(CharIn("eE") ~ CharIn("+-").? ~ digits)
+  val fractional = P("." ~ digits)
+  val integral = P("0" | CharIn('1' to '9') ~ digits.?)
+
+  val number = P(CharIn("+-").? ~ integral ~ fractional.? ~ exponent.?).!.map(
+    x => JSDouble(x.toDouble)
+  )
+
+  val `null` = P("null").map(_ => JSNull)
+  val `false` = P("false").map(_ => JSBool(false))
+  val `true` = P("true").map(_ => JSBool(true))
+
+  val hexDigit = P(CharIn('0' to '9', 'a' to 'f', 'A' to 'F'))
+  val unicodeEscape = P("u" ~ hexDigit ~ hexDigit ~ hexDigit ~ hexDigit)
+  val escape = P("\\" ~ (CharIn("\"/\\bfnrt") | unicodeEscape))
+
+  val strChars = P(CharsWhile(StringChars))
+  val string =
+    P(space ~ "\"" ~/ (strChars | escape).rep.! ~ "\"").map(JSString)
+
+  val array =
+    P("[" ~/ jsonExpr.rep(sep = ",".~/) ~ space ~ "]").map(xs => JSArray(xs.toList))
+
+  val pair: P[(String, JSValue)] = P(string.map(_.s) ~/ ":" ~/ jsonExpr)
+
+  val obj =
+    P("{" ~/ pair.rep(sep = ",".~/) ~ space ~ "}").map(xs => JSObject(xs.toList))
+
+  val jsonExpr: P[JSValue] = P(
+    space ~ (obj | array | string | `true` | `false` | `null` | number) ~ space
+  )
+
+  performanceOfParsers { f: Gen[List[String]] =>
+    runBM(f, "FastParseBools", jsonExpr)
   }(range)
 }

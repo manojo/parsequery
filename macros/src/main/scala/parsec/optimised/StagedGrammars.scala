@@ -12,6 +12,7 @@ trait StagedGrammars
     extends GrammarTrees
     with ParserOps
     with ParseResultOps
+    with ReaderOps
     with Zeroval {
 
   val c: Context
@@ -99,10 +100,16 @@ trait StagedGrammars
         val failureRestTerm = TermName(c.freshName("rest"))
         val failureRest = q"$failureRestTerm"
 
-        def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = q"""
-          $newName($in) match {
-            case Success($successResTerm, $successRestTerm) => ${success(successRes, successRest)}
-            case Failure(_, $failureRestTerm) => ${failure(failureRest)}
+        val inputTerm = TermName(c.freshName("input"))
+        val input = q"$inputTerm"
+
+        def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) = q"""
+          val $inputTerm = ${in.toCharReader}
+          $newName($input) match {
+            case Success($successResTerm, $successRestTerm) =>
+              ${success(successRes, mkCharReader(q"$successRest.source", q"$successRest.pos"))}
+            case Failure(_, $failureRestTerm) =>
+              ${failure(mkCharReader(q"$failureRest.source", q"$failureRest.pos"))}
           }
         """
       }})

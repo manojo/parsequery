@@ -6,6 +6,12 @@ trait Reader[+T] {
   def rest: Reader[T]
   def atEnd: Boolean
 
+  /**
+   * TODO: should every reader have a source?
+   * and a pos?
+   */
+  def source: Array[Char]
+  def pos: Int
 }
 
 trait StringReader[+T] extends Reader[T] {

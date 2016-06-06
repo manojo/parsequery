@@ -3,7 +3,12 @@ package parsec.optimised
 import scala.reflect.macros.blackbox.Context
 import util.Zeroval
 
-trait ParseResultOps { self: Zeroval =>
+/**
+ * A ParseResult needs to know of a CPS encoding for a CharReader
+ * We specialise to `CharReader` since parsers above already do it too.
+ * TODO: abstract as and when needed.
+ */
+trait ParseResultOps { self: ReaderOps with Zeroval =>
 
   val c: Context
   import c.universe._
@@ -17,75 +22,102 @@ trait ParseResultOps { self: Zeroval =>
    *     forall X. (success: (T, Input) => X, failure: (Input) => X) => X
    */
   abstract class ParseResult(val elemType: Type) { self =>
-    def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree): Tree
+    def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree): Tree
 
     def map(t: Type, f: Tree => Tree) = new ParseResult(t) {
       /**
        * we make a join point right away, and avoid all the mess
        * later
        */
-      def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree): Tree = {
+      def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree): Tree = {
         val isSuccessTerm = TermName(c.freshName("success"))
         val isSuccess = q"$isSuccessTerm"
 
-        val inputTerm = TermName(c.freshName("in"))
-        val input = q"$inputTerm"
+        val sourceTerm = TermName(c.freshName("source"))
+        val source = q"$sourceTerm"
+
+        val tmpPosTerm = TermName(c.freshName("tmpPos"))
+        val tmpPos = q"$tmpPosTerm"
 
         val tmpResTerm = TermName(c.freshName("tmpRes"))
         val tmpRes = q"$tmpResTerm"
 
         val applied = self.apply(
-          (res, rest) => q"""
-            $tmpRes = $res
-            $input = $rest
-            $isSuccess = true
-          """,
-          rest => q"$input = $rest"
+          (res, rest) => {
+
+            val readerApplied = rest.apply {
+              (src, pos) => q"$source = $src; $tmpPos = $pos"
+            }
+
+            q"""
+              $tmpRes = $res
+              $readerApplied
+              $isSuccess = true
+            """
+          },
+
+          rest => rest.apply {
+            (src, pos) => q"$source = $src; $tmpPos = $pos"
+          }
         )
 
         q"""
           var $isSuccessTerm: Boolean = false
           var $tmpResTerm: ${self.elemType} = ${zeroValue(self.elemType)}
-          var $inputTerm: Input = null
+          var $sourceTerm: Array[Char] = null
+          var $tmpPosTerm: Int = 0
 
           $applied
 
-          if ($isSuccess) ${success(f(tmpRes), input)}
-          else ${failure(input)}
+          if ($isSuccess) ${success(f(tmpRes), mkCharReader(source, tmpPos)) }
+          else ${failure(mkCharReader(source, tmpPos))}
         """
       }
     }
 
-    def flatMapWithNext(t: Type, f: Tree => Tree => ParseResult) =  {
+    def flatMapWithNext(t: Type, f: Tree => CharReader => ParseResult) =  {
       new ParseResult(t) {
-        def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+        def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) = {
           val isSuccessTerm = TermName(c.freshName("success"))
           val isSuccess = q"$isSuccessTerm"
 
-          val inputTerm = TermName(c.freshName("in"))
-          val input = q"$inputTerm"
+          val sourceTerm = TermName(c.freshName("source"))
+          val source = q"$sourceTerm"
+
+          val tmpPosTerm = TermName(c.freshName("tmpPos"))
+          val tmpPos = q"$tmpPosTerm"
 
           val tmpResTerm = TermName(c.freshName("tmpRes"))
           val tmpRes = q"$tmpResTerm"
 
           val applied = self.apply(
-            (res, rest) => q"""
-              $tmpRes = $res
-              $input = $rest
-              $isSuccess = true
-            """,
-            rest => q"$input = $rest"
+            (res, rest) => {
+
+              val readerApplied = rest.apply {
+                (src, pos) => q"$source = $src; $tmpPos = $pos"
+              }
+
+              q"""
+                $tmpRes = $res
+                $readerApplied
+                $isSuccess = true
+              """
+            },
+            rest => rest.apply {
+              (src, pos) => q"$source = $src; $tmpPos = $pos"
+            }
           )
 
           q"""
             var $isSuccessTerm: Boolean = false
             var $tmpResTerm: ${self.elemType} = ${zeroValue(self.elemType)}
-            var $inputTerm: Input = null
+            var $sourceTerm: Array[Char] = null
+            var $tmpPosTerm: Int = 0
 
             $applied
 
-            if ($isSuccess) ${f(tmpRes)(input).apply(success, failure)}
-            else ${failure(input)}
+            if ($isSuccess) ${f(tmpRes)(mkCharReader(source, tmpPos)).apply(success, failure)}
+            else ${failure(mkCharReader(source, tmpPos))}
           """
         }
       }
@@ -95,26 +127,41 @@ trait ParseResultOps { self: Zeroval =>
       val isSuccessTerm = TermName(c.freshName("success"))
       val isSuccess = q"$isSuccessTerm"
 
-      val inputTerm = TermName(c.freshName("in"))
-      val input = q"$inputTerm"
+      val sourceTerm = TermName(c.freshName("source"))
+      val source = q"$sourceTerm"
+
+      val tmpPosTerm = TermName(c.freshName("tmpPos"))
+      val tmpPos = q"$tmpPosTerm"
 
       val tmpResTerm = TermName(c.freshName("tmpRes"))
       val tmpRes = q"$tmpResTerm"
 
       val applied = self.apply(
-        (res, rest) => q"$isSuccess = true; $tmpRes = $res; $input = $rest",
+        (res, rest) => {
+
+          val readerApplied = rest.apply {
+            (src, pos) => q"$source = $src; $tmpPos = $pos"
+          }
+
+          q"""
+            $isSuccess = true
+            $tmpRes = $res
+            $readerApplied
+          """
+        },
         rest => q"()" // we don't need to do anything in this case
       )
 
-      def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+      def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) = {
         q"""
         var $isSuccessTerm: Boolean = false
-        var $inputTerm: Input = null
+        var $sourceTerm: Array[Char] = null
+        var $tmpPosTerm: Int = 0
         var $tmpResTerm: ${this.elemType} = ${zeroValue(this.elemType)}
 
         $applied
 
-        if ($isSuccess) ${success(tmpRes, input)}
+        if ($isSuccess) ${success(tmpRes, mkCharReader(source, tmpPos))}
         else ${that.apply(success, failure)}
         """
       }
@@ -131,6 +178,10 @@ trait ParseResultOps { self: Zeroval =>
       val resTerm = TermName(c.freshName("res"))
       val res = q"$resTerm"
 
+      /**
+       * This is the only place where we will create an input
+       * Otherwise we stay in the CPS encoding
+       */
       val inputTerm = TermName(c.freshName("input"))
       val input = q"$inputTerm"
 
@@ -138,16 +189,15 @@ trait ParseResultOps { self: Zeroval =>
         (result, rest) => q"""
           $success = true
           $res = $result
-          $input = $rest
+          $input = ${rest.toCharReader}
         """,
 
         (rest) => q"""
           $success = false
-          $input = $rest
+          $input = ${rest.toCharReader}
         """
       )
 
-      val inputType = tq"Input".tpe
       q"""
         var $isSuccessTerm: Boolean = false
         var $resTerm: $elemType = ${zeroValue(elemType)}
@@ -158,19 +208,19 @@ trait ParseResultOps { self: Zeroval =>
     }
   }
 
-  def mkSuccess(elemType: Type, elem: Tree, rest: Tree) = new ParseResult(elemType) {
-    def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) =
+  def mkSuccess(elemType: Type, elem: Tree, rest: CharReader) = new ParseResult(elemType) {
+    def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) =
       success(elem, rest)
   }
 
-  def mkFailure(rest: Tree) = new ParseResult(typeOf[scala.Nothing]) {
-    def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) =
+  def mkFailure(rest: CharReader) = new ParseResult(typeOf[scala.Nothing]) {
+    def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) =
       failure(rest)
   }
 
   def cond(elemType: Type)(test: Tree, thenp: ParseResult, elsep: ParseResult) = {
     new ParseResult(elemType) {
-      def apply(success: (Tree, Tree) => Tree, failure: Tree => Tree) = {
+      def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) = {
         q"""
           if ($test) ${thenp(success, failure)}
           else       ${elsep(success, failure)}
