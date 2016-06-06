@@ -187,7 +187,6 @@ class OptimisedParserSuite
 
   }
 
-
   test("basic recursion works") {
 
     val listOfAsParser = optimise {
