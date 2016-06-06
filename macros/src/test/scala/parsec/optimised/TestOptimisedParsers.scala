@@ -125,4 +125,160 @@ class OptimisedParserSuite
       expectedPos = 5
     )
   }
+
+  test("parsing strings works") {
+
+    val greeting = "  greetings   lion"
+    val greetReader = CharReader(greeting.toArray)
+
+    checkFailure(optimise(accept("greetings")), CharReader("greetin".toArray))
+
+    val greetingsLionParser = optimise {
+      skipWs(accept("greetings")) ~ accept("lion")
+    }
+
+    checkSuccess(greetingsLionParser, greetReader)(
+      expected = ("greetings", "lion"),
+      expectedPos = greeting.length
+    )
+  }
+
+  test("parsing string literals works") {
+
+    val emptyStringLit = "\"\"".toArray
+    val aQuote = "\"Dr. Livingstone, I presume?\"".toArray
+
+    val stringLitParser = optimise(stringLiteral)
+
+    checkSuccess(stringLitParser, CharReader(emptyStringLit))(
+      expected = "",
+      expectedPos = emptyStringLit.length
+    )
+
+    checkSuccess(stringLitParser, CharReader(aQuote))(
+      expected = "Dr. Livingstone, I presume?",
+      expectedPos = aQuote.length
+    )
+  }
+
+  test("repsep works") {
+
+    val noNames = "".toArray
+    val justOneName = """ "Roger" """.toArray
+    val names = """ "Roger", "Rafa", "Nole", "Stan" """.toArray
+
+    val nameParser: Parser[List[String]] =
+      optimise(repsep(skipWs(stringLiteral), accept(',')))
+
+    checkSuccess(nameParser, CharReader(names))(
+      expected = List("Roger", "Rafa", "Nole", "Stan"),
+      expectedPos = names.length
+    )
+
+    checkSuccess(nameParser, CharReader(noNames))(
+      expected = List(),
+      expectedPos = noNames.length
+    )
+
+    checkSuccess(nameParser, CharReader(justOneName))(
+      expected = List("Roger"),
+      expectedPos = justOneName.length
+    )
+
+  }
+
+
+  test("basic recursion works") {
+
+    val listOfAsParser = optimise {
+      def listOfAs: Parser[List[Char]] = (
+        (accept('a') ~ listOfAs).map { case (x, xs) => x :: xs } |
+        success(Nil)
+      )
+      listOfAs
+    }
+
+    checkSuccess(listOfAsParser, CharReader("".toArray))(
+      expected = List[Char](),
+      expectedPos = 0
+    )
+
+    checkSuccess(listOfAsParser, CharReader("aaaaa".toArray))(
+      expected = List('a','a','a','a','a'),
+      expectedPos = 5
+    )
+  }
+
+  test("json parser works") {
+
+    sealed abstract class JSValue
+    case class JSObject(dict: List[(String, JSValue)]) extends JSValue
+    case class JSArray(arr: List[JSValue]) extends JSValue
+    case class JSDouble(d: Int) extends JSValue
+    case class JSString(s: String) extends JSValue
+    case class JSBool(b: Boolean) extends JSValue
+    case object JSNull extends JSValue
+
+    val jsonParser = optimise {
+
+      def main: Parser[JSValue] = (
+        obj |
+        arr |
+        stringLiteral.map(x => JSString(x)) |
+        number.map(x => JSDouble(x)) |
+        accept("null").map(_ => JSNull) |
+        accept("true").map(_ => JSBool(true)) |
+        accept("false").map(_ => JSBool(false))
+      )
+
+      def obj: Parser[JSValue] = (
+        skipWs(accept('{')) ~> repsep(member, skipWs(accept(','))) <~ skipWs(accept('}'))
+      ) map { x => JSObject(x) }
+
+      def arr: Parser[JSValue] = (
+        skipWs(accept('[')) ~> repsep(main, skipWs(accept(','))) <~ skipWs(accept(']'))
+      ) map { x => JSArray(x) }
+
+      def member: Parser[(String, JSValue)] =
+        stringLiteral ~ (skipWs(accept(':')) ~> main)
+
+      main
+    }
+
+    val bool = "true".toArray
+    val strLit = "\"Roger pon top\"".toArray
+    val num = "123".toArray
+    val oneObj = """ {
+      "name" : {
+        "first": "Roger",
+        "last": "Federer"
+      }
+    }""".toArray
+
+    checkSuccess(jsonParser, CharReader(bool))(
+      expected = JSBool(true),
+      expectedPos = bool.length
+    )
+
+    checkSuccess(jsonParser, CharReader(strLit))(
+      expected = JSString("Roger pon top"),
+      expectedPos = strLit.length
+    )
+
+    checkSuccess(jsonParser, CharReader(num))(
+      expected = JSDouble(123),
+      expectedPos = num.length
+    )
+
+    checkSuccess(jsonParser, CharReader(oneObj))(
+      expected = JSObject(List(("name", JSObject(
+        List(
+          ("first", JSString("Roger")),
+          ("last", JSString("Federer"))
+        )
+      )))),
+      expectedPos = oneObj.length
+    )
+  }
+
 }

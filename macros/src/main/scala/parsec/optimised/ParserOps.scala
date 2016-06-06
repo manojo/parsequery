@@ -132,8 +132,8 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
           var $isSuccessTerm: Boolean = false
 
           while ($continue) {
-            if ($curIn.atEnd) { $continue = false }
-            else if ($curIdx >= $strLen) { $continue = false; $isSuccess = true }
+            if ($curIdx >= $strLen) { $continue = false; $isSuccess = true }
+            else if ($curIn.atEnd) { $continue = false }
             else if ($curIn.first != $strArr($curIdx)) { $continue = false }
             else { $curIdx += 1; $curIn = $curIn.rest }
           }
@@ -155,6 +155,33 @@ trait ParserOps { self: ParseResultOps with Zeroval =>
   ).toSkipper
 
   def skipWs(p: Parser) = ws ~> p <~ ws
+
+  /**
+   * other helpful parsers
+   */
+  def digit = acceptIf(typeOf[Char], elem => q"$elem.isDigit")
+  def digit2Int = digit.map(typeOf[Int], elem => q"($elem - '0').toInt")
+  def number = digit2Int.flatMap(typeOf[Int], d =>
+    fromParser(typeOf[Int], digit2Int).fold(
+      typeOf[Int],
+      d,
+      (acc, elem) => q"$acc * 10 + $elem"
+    )
+  )
+
+  def stringLiteral = {
+    import scala.collection.mutable.StringBuilder
+
+    (accept('"') ~>
+      fromParser(
+        typeOf[Char],
+        acceptIf(typeOf[Char], c => q"""$c != '"'""")).fold(
+          typeOf[StringBuilder],
+          q"scala.collection.mutable.StringBuilder.newBuilder",
+          (acc, elem) => q"$acc.append($elem)"
+      )
+    <~ accept('"')).map(typeOf[String], (sbuf => q"$sbuf.toString"))
+  }
 
   /**
    * a `FoldParser` represents a ``late'' repetition parser

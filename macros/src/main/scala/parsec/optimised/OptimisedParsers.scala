@@ -43,7 +43,7 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
    * `Grammar` trees for all parsers declared in the block
    * including the final one.
    *
-   * A parser block can only contain (for now) parser declarations
+   * A parser block can only contain parser declarations (for now)
    *
    */
   def createParserBlock(statements: List[Tree]): ParserBlock = {
@@ -93,10 +93,25 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
    */
   def transform(pBlock: ParserBlock): Tree = {
 
-    import scala.collection.mutable.{Map => MuMap}
-    val oldToNew: MuMap[Name, Name] = MuMap.empty
-
     val ParserBlock(ruleMap, finalG) = pBlock
+
+    /**
+     * for each parser definition in scope we create a new, but identical
+     * definition. We cannot re-use the same name as before since we are creating
+     * a new definition, hence the need to create a new TermName.
+     *
+     * The `oldToNew` map contains the mapping to these new names.
+     * During further manipulations, a previously encountered old name
+     * is replaced by the new name. This is especially handy for dealing
+     * with recursive functions
+     */
+    val oldToNew: Map[Name, TermName] = (
+      for ((name, _) <- ruleMap) yield {
+        val TermName(nameString) = name
+        val newName = c.freshName(TermName(nameString))
+        (name, newName)
+      }
+    ).toMap
 
     /**
      * we first stage each parser we see, i.e.
@@ -105,7 +120,7 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
      */
     val stagedParsers: Map[TermName, Option[Parser]] = {
       for ((name, ParserDecl(_, _, _, g)) <- ruleMap)
-      yield (name -> stage(g))
+      yield (name -> stage(g)(oldToNew))
     }
 
     /**
@@ -136,16 +151,11 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
     val stmts: List[Tree] = {
       (for ((_, ParserDecl(name, tparams, retType, g)) <- ruleMap) yield {
 
-        println("return type")
-        println(retType)
-
-        val TermName(nameString) = name
-        val tmpParserName = c.freshName(TermName(nameString))
-        oldToNew += (name -> tmpParserName)
+        val newParserName = oldToNew(name)
 
         functionalised.get(name) match {
-          case Some(Some(parser)) => q"def $tmpParserName[..$tparams]: $retType = $parser"
-          case _            => q"def $tmpParserName[..$tparams]: $retType = $g"
+          case Some(Some(parser)) => q"def $newParserName[..$tparams]: $retType = $parser"
+          case _            => q"def $newParserName[..$tparams]: $retType = $g"
         }
       }).toList
     }
