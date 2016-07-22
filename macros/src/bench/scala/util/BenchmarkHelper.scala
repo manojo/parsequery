@@ -20,7 +20,7 @@ trait BenchmarkHelper extends Bench.ForkedTime with java.io.Serializable {
 
   override def executor = SeparateJvmsExecutor(
     new Executor.Warmer.Default,
-    Aggregator.min[Double],
+    Aggregator.average,
     new Measurer.Default
   )
 
