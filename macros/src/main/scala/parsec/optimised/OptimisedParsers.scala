@@ -2,7 +2,6 @@ package parsec.optimised
 
 import parsec._
 import util._
-import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.annotation.tailrec
 
@@ -10,6 +9,12 @@ trait OptimisedParsers extends CharParsers {
 
   def optimise[T](parserBlock: => this.Parser[T]): Parser[T] =
     macro OptimisedParsersImpl.optimise
+
+  /**
+   * Allows to see generated code with ids and owners
+   */
+  def debug[T](block: => T): T =
+    macro OptimisedParsersImpl.debug
 
 }
 
@@ -211,5 +216,10 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
     case _ =>
       println(showCode(parserBlock))
       c.abort(c.enclosingPosition, "the body does not match anything we expect")
+  }
+
+  def debug(block: c.Tree) = {
+    println(showRaw(block, printIds = true, printOwners = true))
+    block
   }
 }

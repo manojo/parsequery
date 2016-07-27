@@ -11,6 +11,7 @@ object ParsequeryBuild extends Build {
     scalacOptions += "-unchecked",
     scalacOptions += "-feature",
     scalacOptions += "-language:higherKinds",
+    scalacOptions += "-language:experimental.macros",
     //scalacOptions += "-Xprint:typer",
     //scalacOptions += "-uniqid",
     //scalacOptions += "-Yshow-syms",

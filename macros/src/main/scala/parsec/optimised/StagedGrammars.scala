@@ -1,7 +1,7 @@
 package parsec.optimised
 
 import scala.reflect.macros.blackbox.Context
-import util.Zeroval
+import util.{Zeroval, TreeTools}
 
 /**
  * This trait contains functionality to stage parser implementations
@@ -13,13 +13,11 @@ trait StagedGrammars
     with ParserOps
     with ParseResultOps
     with ReaderOps
-    with Zeroval {
+    with Zeroval
+    with TreeTools {
 
   val c: Context
   import c.universe._
-
-  /* TODO: this is a bit hardcoded */
-  val realElemType = typeOf[OptimisedParsers#Elem]
 
   /**
    * transforms a grammar into a "staged" parser
@@ -30,15 +28,15 @@ trait StagedGrammars
    * named parsers with their modified names
    */
   def stage(g: Grammar)(implicit oldToNew: Map[Name, TermName]): Option[Parser] = g match {
-    case AcceptIf(p) => Some(acceptIf(realElemType, p))
-    case AcceptStr(s) => Some(acceptStr(s))
-    case SuccessGrammar(t, elem) =>
+    case a @ AcceptIf(_, p)  => Some(acceptIf(a.t, p))
+    case AcceptStr(_, s) => Some(acceptStr(s))
+    case SuccessGrammar(_, t, elem) =>
       Some(mkParser(t, { in => mkSuccess(t, elem, in) }))
-    case Number => Some(number)
-    case StringLiteral => Some(stringLiteral)
+    case Number(_) => Some(number)
+    case StringLiteral(_) => Some(stringLiteral)
 
     /** TODO: should this be desugared before showing up here? */
-    case SkipWs(t, g) => for (f <- stage(g)) yield skipWs(f)
+    case SkipWs(_, t, g) => for (f <- stage(g)) yield skipWs(f)
 
     case Rep(g, t) => for (f <- stage(g)) yield rep(t, f)
 
@@ -70,10 +68,11 @@ trait StagedGrammars
     /**
      * The `map` takes a `Tree => Tree` function
      * The naive `id` transformation involves
-     * eta-expanding. TODO: inline functions which
-     * can be.
+     * eta-expanding.
      */
-    case Mapped(g, f, t) => for (p <- stage(g)) yield p.map(t, t => q"$f($t)")
+    case Mapped(g, f, t) => for (p <- stage(g))
+      yield p.map(t, t => q"$f($t)")
+      //yield p.map(t, t => inline(f, List(t)))
 
     /**
      * If we see a named parser, staging it boils down to calling the new
