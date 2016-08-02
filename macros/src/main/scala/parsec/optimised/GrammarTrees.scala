@@ -18,35 +18,43 @@ trait GrammarTrees {
    * Should mostly work!
    */
   val parserType = typeOf[OptimisedParsers#Parser[_]]
+  /* TODO: this is a bit hardcoded */
+  val realElemType = typeOf[OptimisedParsers#Elem]
 
-  abstract class Grammar
+  abstract class Grammar(val t: Type)
 
   /** combinators */
-  case class Mapped(g: Grammar, f: Tree, t: Type) extends Grammar
+  case class Mapped(g: Grammar, f: Tree, t2: Type) extends Grammar(t2)
 
-  case class Concat(l: Grammar, r: Grammar, t: Type) extends Grammar
-  case class ConcatLeft(l: Grammar, r: Grammar, t: Type) extends Grammar
-  case class ConcatRight(l: Grammar, r: Grammar, t: Type) extends Grammar
-  case class Or(l: Grammar, r: Grammar, t: Type) extends Grammar
+  case class Concat(l: Grammar, r: Grammar, t2: Type)
+    extends Grammar(appliedType(typeOf[Tuple2[_, _]], List(l.t, t2)))
+  case class ConcatLeft(l: Grammar, r: Grammar, t2: Type) extends Grammar(l.t)
+  case class ConcatRight(l: Grammar, r: Grammar, t2: Type) extends Grammar(t2)
+  case class Or(l: Grammar, r: Grammar, t2: Type) extends Grammar(t2)
   /**
    * we actually want the original tree
    * only the transformation phase will work on creating a new one
    * if needed
    */
-  case class Rep(g: Grammar, t: Type) extends Grammar
-  case class Repsep(g: Grammar, g2: Grammar, t: Type, u: Type) extends Grammar
-  //case class RepFold(g: Grammar, t: Type)(z: Tree, comb: Tree) extends Grammar
+  case class Rep(g: Grammar, t2: Type)
+    extends Grammar(appliedType(typeOf[List[_]], t2))
+  case class Repsep(g: Grammar, g2: Grammar, t2: Type, u: Type)
+    extends Grammar(appliedType(typeOf[List[_]], t2))
+
+  //case class RepFold(g: Grammar, t2: Type)(z: Tree, comb: Tree) extends Grammar
 
   /** base parsers */
-  case class AcceptIf(p: Tree => Tree) extends Grammar
-  case class AcceptStr(s: String) extends Grammar
-  case class PIdent(name: Ident) extends Grammar
-  case class SuccessGrammar(t: Type, elem: Tree) extends Grammar
-  case object Number extends Grammar
-  case object StringLiteral extends Grammar
+  case class AcceptIf(path: List[Tree], p: Tree => Tree)
+    extends Grammar(realElemType)
+  case class AcceptStr(path: List[Tree], s: String)
+    extends Grammar(typeOf[String])
+  case class PIdent(name: Ident) extends Grammar(name.tpe)
+  case class SuccessGrammar(path: List[Tree], t2: Type, elem: Tree) extends Grammar(t2)
+  case class Number(path: List[Tree]) extends Grammar(typeOf[Int])
+  case class StringLiteral(path: List[Tree]) extends Grammar(typeOf[String])
 
   /* TODO: should desugar this later */
-  case class SkipWs(t: Type, g: Grammar) extends Grammar
+  case class SkipWs(path: List[Tree], t2: Type, g: Grammar) extends Grammar(t2)
 
   /**
    * Liftable and unliftable instances of a grammar
@@ -63,17 +71,30 @@ trait GrammarTrees {
       Repsep(g, sep, t, u)
 
     /** base parsers */
-    case q"$_.acceptIf($f)" => AcceptIf(elem => q"$f($elem)")
-    case q"$_.accept(${arg: Char})" => AcceptIf(elem => q"$elem == $arg")
-    case q"$_.letter" => AcceptIf(elem => q"$elem.isLetter")
-    case q"$_.digit" => AcceptIf(elem => q"$elem.isDigit")
-    case q"$_.number" => Number
-    case q"$_.stringLiteral" => StringLiteral
+    case q"(..$p).acceptIf($f)"         => AcceptIf(p, elem => q"$f($elem)")
+    case q"(..$p).accept(${arg: Char})" => AcceptIf(p, elem => q"$elem == $arg")
+    case q"(..$p).letter"               => AcceptIf(p, elem => q"$elem.isLetter")
+    case q"(..$p).digit"                => AcceptIf(p, elem => q"$elem.isDigit")
+    case q"(..$p).digit2Int" =>
 
-    case q"$_.accept(${arg: String})" => AcceptStr(arg)
-    case q"$_.success[${t: Type}]($elem)" => SuccessGrammar(t, elem)
+      val argTerm = TermName(c.freshName("arg"))
+      val arg = q"$argTerm"
 
-    case q"$_.skipWs[${t: Type}](${g: Grammar})" => SkipWs(t, g)
+      val q"${d: Grammar}" = q"(..$p).digit"
+      val f = q"($arg: Char) => {($arg - '0').toInt}"
+
+      val intType: Type = typeOf[Int]
+
+      val q"${g: Grammar}" = q"$d.map[$intType]($f)"
+      g
+
+    case q"(..$p).number"        => Number(p)
+    case q"(..$p).stringLiteral" => StringLiteral(p)
+
+    case q"(..$p).accept(${arg: String})"     => AcceptStr(p, arg)
+    case q"(..$p).success[${t: Type}]($elem)" => SuccessGrammar(p, t, elem)
+
+    case q"(..$p).skipWs[${t: Type}](${g: Grammar})" => SkipWs(p, t, g)
 
     /**
      * if we find any identifier, we make sure that it conforms to type
@@ -94,16 +115,16 @@ trait GrammarTrees {
     case Repsep(g, sep, t, u) => q"repsep[$t, $u]($g, $sep)"
 
     /** base parsers */
-    case AcceptIf(p) =>
+    case AcceptIf(p, pred) =>
       val temp = TermName(c.freshName("temp"))
-      q"acceptIf(($temp: Elem) => ${p(q"$temp")})"
+      q"(..$p).acceptIf(($temp: Elem) => ${pred(q"$temp")})"
 
-    case AcceptStr(s) => q"accept($s)"
-    case SuccessGrammar(t, elem) => q"success[$t]($elem)"
+    case AcceptStr(p, s) => q"(..$p).accept($s)"
+    case SuccessGrammar(p, t, elem) => q"(..$p).success[$t]($elem)"
     case PIdent(tname) => q"$tname"
-    case SkipWs(t, g) => q"skipWs[$t]($g)"
+    case SkipWs(p, t, g) => q"(..$p).skipWs[$t]($g)"
 
-    case Number => q"number"
-    case StringLiteral => q"stringLiteral"
+    case Number(p) => q"(..$p).number"
+    case StringLiteral(p) => q"(..$p).stringLiteral"
   }
 }

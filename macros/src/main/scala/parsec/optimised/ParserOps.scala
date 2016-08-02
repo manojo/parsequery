@@ -56,7 +56,7 @@ trait ParserOps { self: ParseResultOps with ReaderOps with Zeroval =>
     def apply(in: CharReader) = f(in)
   }
 
-  def acceptIf(elemType: Type, p: Tree => Tree): Parser = mkParser(elemType, { (in) =>
+  def acceptIf(elemType: Type, p: Tree => Tree): Parser = mkParser(elemType, { in =>
     cond(elemType)(in.atEnd,
       mkFailure(in),
       cond(elemType)(q"${p(in.first)}",
