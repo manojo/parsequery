@@ -28,7 +28,7 @@ trait StagedGrammars
    * named parsers with their modified names
    */
   def stage(g: Grammar)(implicit oldToNew: Map[Name, TermName]): Option[Parser] = g match {
-    case a @ AcceptIf(_, p)  => Some(acceptIf(a.t, p))
+    case a @ AcceptIf(_, p)  => Some(acceptIf(a.tpe, p))
     case AcceptStr(_, s) => Some(acceptStr(s))
     case SuccessGrammar(_, t, elem) =>
       Some(mkParser(t, { in => mkSuccess(t, elem, in) }))

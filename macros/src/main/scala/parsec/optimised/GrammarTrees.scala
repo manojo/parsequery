@@ -23,25 +23,25 @@ trait GrammarTrees { self: TreeTools =>
   /* TODO: this is a bit hardcoded */
   val realElemType = typeOf[OptimisedParsers#Elem]
 
-  abstract class Grammar(val t: Type)
+  abstract class Grammar(val tpe: Type)
 
   /** combinators */
-  case class Mapped(g: Grammar, f: Tree, t2: Type) extends Grammar(t2)
+  case class Mapped(g: Grammar, f: Tree, tpe2: Type) extends Grammar(tpe2)
 
-  case class Concat(l: Grammar, r: Grammar, t2: Type)
-    extends Grammar(appliedType(typeOf[Tuple2[_, _]], List(l.t, t2)))
-  case class ConcatLeft(l: Grammar, r: Grammar, t2: Type) extends Grammar(l.t)
-  case class ConcatRight(l: Grammar, r: Grammar, t2: Type) extends Grammar(t2)
-  case class Or(l: Grammar, r: Grammar, t2: Type) extends Grammar(t2)
+  case class Concat(l: Grammar, r: Grammar, tpe2: Type)
+    extends Grammar(appliedType(typeOf[Tuple2[_, _]], List(l.tpe, tpe2)))
+  case class ConcatLeft(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(l.tpe)
+  case class ConcatRight(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(tpe2)
+  case class Or(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(tpe2)
   /**
    * we actually want the original tree
    * only the transformation phase will work on creating a new one
    * if needed
    */
-  case class Rep(g: Grammar, t2: Type)
-    extends Grammar(appliedType(typeOf[List[_]], t2))
-  case class Repsep(g: Grammar, g2: Grammar, t2: Type, u: Type)
-    extends Grammar(appliedType(typeOf[List[_]], t2))
+  case class Rep(g: Grammar, tpe2: Type)
+    extends Grammar(appliedType(typeOf[List[_]], tpe2))
+  case class Repsep(g: Grammar, g2: Grammar, tpe2: Type, u: Type)
+    extends Grammar(appliedType(typeOf[List[_]], tpe2))
 
   //case class RepFold(g: Grammar, t2: Type)(z: Tree, comb: Tree) extends Grammar
 
@@ -51,12 +51,12 @@ trait GrammarTrees { self: TreeTools =>
   case class AcceptStr(path: List[Tree], s: String)
     extends Grammar(typeOf[String])
   case class PIdent(name: Ident) extends Grammar(name.tpe)
-  case class SuccessGrammar(path: List[Tree], t2: Type, elem: Tree) extends Grammar(t2)
+  case class SuccessGrammar(path: List[Tree], tpe2: Type, elem: Tree) extends Grammar(tpe2)
   case class Number(path: List[Tree]) extends Grammar(typeOf[Int])
   case class StringLiteral(path: List[Tree]) extends Grammar(typeOf[String])
 
   /* TODO: should desugar this later */
-  case class SkipWs(path: List[Tree], t2: Type, g: Grammar) extends Grammar(t2)
+  case class SkipWs(path: List[Tree], tpe2: Type, g: Grammar) extends Grammar(tpe2)
 
   /**
    * Liftable and unliftable instances of a grammar

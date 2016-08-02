@@ -79,7 +79,7 @@ trait ParsequeryTransform
       val inlinedf2 = inline(f2, List(arg))
       val inlined = inline(f, List(inlinedf2))
 
-      val composed = q"($argTerm: ${g1.t}) => $inlined"
+      val composed = q"($argTerm: ${g1.tpe}) => $inlined"
 
       transformMap(g1, composed, u)
 
