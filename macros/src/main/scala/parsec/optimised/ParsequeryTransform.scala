@@ -86,12 +86,116 @@ trait ParsequeryTransform
 
     /**
      * The map function will only ever be involved on one side
-     * TODO: The right hand side must be turned into a recogniser
+     * TODO: The right/left hand sides must be turned into recognisers
      */
     case ConcatLeft(l, r, t)  => ConcatLeft(transformMap(l, f, u), r, t)
     case ConcatRight(l, r, t) => ConcatRight(l, transformMap(r, f, u), u)
 
-    //case Concat(l, r, t) =>
+    /**
+     * We first focus on the simplest variant possible.
+     * We assume that `l` is not itself a concat.
+     *
+     * Step 1: analyse the body of `f` to identify (a unique) independent application on `l`,
+     * if any.
+     * Step 2: carry this application to its own function
+     * Step 3: replace the application's occurence in f by a value
+     * Recursively propagate transform as appropriate
+     */
+    case Concat(l, r, t) => f match {
+
+      case q"(..$params) => $body" => body match {
+
+        /** we are assuming only one case in the body */
+        case q"$_ match { case $c1 }" => c1 match {
+
+          case cq"$pat => $bdy" =>
+
+            /**
+             * We collect all binding symbols
+             * This is where we assume that l is not a concat: we expect
+             * `fst` to bind to it.
+             */
+            val fst :: rest = (new PatternBindings).inspect(pat)
+
+            /**
+             * TODO: check if `fst` is used at all
+             */
+            largestIndepApplication(fst, rest)(bdy) match {
+              case Some(maybeApp) => maybeApp match {
+                /**
+                 * Only `l` is used. This means that we have
+                 * [[(l ~ r) map { case (a, b) => a }]]
+                 *
+                 * This is converted to [[l <~ r]]
+                 */
+                case Ident(_) => transform(ConcatLeft(l, r, t))
+
+                /**
+                 * Else we have a function application
+                 */
+                case app @ Apply(_, _) =>
+
+                  val funArg = freshAnonVal("arg", l.tpe)
+                  /**
+                   * Does the appTransformed *need* to be a `typingTransform`?
+                   */
+                  val appTransformed = c.internal.typingTransform(app)((tree, api) => tree match {
+                    case Ident(_) if tree.symbol == fst =>
+                        api.typecheck(q"${funArg.symbol}")
+                    case _ =>
+                      api.default(tree)
+                  })
+                  val singledOutFunction = q"($funArg) => $appTransformed"
+
+                  /**
+                   * if app is as big as bdy itself then we have
+                   * [[(l ~ r) map { case (a, b) => f(a) }]]
+                   *
+                   * This is converted to [[l map f]] <~ [[r]]
+                   */
+                  if (app.symbol == bdy.symbol) {
+                    ConcatLeft(transform(Mapped(l, singledOutFunction, u)), transform(r), t)
+                  } else {
+                    Mapped(g, f, u)
+                  }
+              }
+
+              /** `fst` is strongly connected to other bindings in the pattern match */
+              case None => Mapped(g, f, u)
+
+            }
+
+          case _ => println("matched no pattern"); Mapped(g, f, u)
+        }
+
+        case _ =>
+          c.warning(f.pos,
+            """The body of your function (applying to a concat) could possibly
+            benefit from optimisations if you use a pattern match syntax, with
+            exactly one case.
+            Do consider changing it!
+            """
+          )
+          println(showCode(f))
+          println(showRaw(f))
+          Mapped(g, f, u)
+      }
+
+      case _ =>
+        c.warning(f.pos,
+          """You are using a function syntax that is not anonymous function
+          syntax. As a result you might be forgoing some optimisations we
+          could perform. Do consider changing it!
+          """
+        )
+        println(showCode(f))
+        println(showRaw(f))
+        Mapped(g, f, u)
+    }
+
+
+
+
 
     case _ => Mapped(g, f, u)
   }

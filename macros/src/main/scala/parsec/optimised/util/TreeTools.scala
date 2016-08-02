@@ -111,4 +111,111 @@ trait TreeTools {
     tree.updateAttachment(macroutil.OrigOwnerAttachment(c.internal.enclosingOwner))
     q"_root_.macroutil.Splicer.changeOwner($tree)"
   }
+
+  /**
+   * In a given tree `t`, sym `a`, and syms `rest`,
+   * find the biggest function application where only `a`
+   * is involved (and none of `rest`) appear.
+   *
+   * Attention: we assume for now that the tree does not have too funky a shape
+   * For instance (a + 2) + b + (a + 6) will not work as expected.
+   */
+  def largestIndepApplication(a: Symbol, rest: List[Symbol])(t: c.Tree): Option[c.Tree] = {
+    val existenceChecker = new VariableExistenceChecker(a, rest)
+
+    /**
+     * The inner loop is only interested in function application trees
+     * At the top level we do check whether we have an Ident (see below)
+     * But at any inner point returning an Ident tree is futile
+     */
+    def loop(tree: c.Tree): Option[c.Tree] = tree match {
+      case Apply(Select(t, _), args) =>
+        /** if the property is satisfied we return the tree itself */
+        if (existenceChecker.satisfied(tree)) Some(tree)
+        else {
+          /**
+           * We must make sure that only one of `t :: args` satisfies the property
+           * in which case we return it.
+           */
+          val recursed = (t :: args).foldLeft[Option[c.Tree]](None) { (acc, elem) =>
+            loop(elem) match {
+              case None => acc
+              case res @ Some(_) =>
+                /**
+                 * if we already have a valid tree in the pipeline we
+                 * have too many already, so we can bail.
+                 */
+                //scalastyle:off return
+                if (acc.isDefined) return None
+                else res
+                //scalastyle:on return
+            }
+          }
+          recursed
+        }
+
+      /**
+       * any other tree form is not tolerated for the moment
+       */
+      case _ => None
+    }
+
+    t match {
+      case i @ Ident(_) if (i.symbol == a) => Some(t)
+      case _ => loop(t)
+    }
+  }
+
+  /**
+   * Given tree `t`, sym `a` and syms `rest`, where `a` and `rest` are idents
+   * does `t` contain `a`, and does it contain any of `rest`?
+   */
+  class VariableExistenceChecker(a: Symbol, rest: List[Symbol]) extends Traverser {
+
+    var seenA: Boolean = false
+    var seenRest: Boolean = false
+
+    override def traverse(tree: c.Tree) = tree match {
+      case i @ Ident(_) =>
+        if (i.symbol == a) { seenA = true }
+        else if (rest.contains(i.symbol)) { seenRest = true }
+
+      case _ => super.traverse(tree)
+    }
+
+    def satisfied(tree: c.Tree): Boolean = {
+      /**
+       * resetting flags so that we can reuse the same checker
+       * many times
+       */
+      seenA = false; seenRest = false
+      traverse(tree)
+      seenA && !seenRest
+    }
+  }
+
+  /**
+   * Finds, in a given tree, the symbols of all
+   * pattern match bindings.
+   *
+   * Example: given
+   *    case (a, (b, c), d) => ...
+   *
+   * returns List(a, b, c, d)
+   */
+  class PatternBindings extends Traverser {
+    import scala.collection.mutable.ListBuffer
+
+    private val usedSymbols = ListBuffer[Symbol]()
+
+    def inspect(tree: c.Tree): List[Symbol] = {
+      traverse(tree)
+      usedSymbols.toList
+    }
+
+    override def traverse(tree: c.Tree) = tree match {
+      case d @ Bind(_, _) => usedSymbols += d.symbol
+      case _ => super.traverse(tree)
+    }
+  }
 }
