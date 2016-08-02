@@ -1,4 +1,4 @@
-package parsec.examples
+/*package parsec.examples
 
 import parsec.optimised.OptimisedParsers
 import parsec._
@@ -54,3 +54,4 @@ object JSONParser extends OptimisedParsers {
     }
   }
 }
+*/

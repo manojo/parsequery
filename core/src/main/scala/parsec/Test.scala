@@ -40,9 +40,11 @@ object Test extends OptimisedParsers {
     val fileName = "data/booleans-6600.json"
     val fileContent = Source.fromFile(fileName).mkString
     //val myReader = CharReader(fileContent.toArray)
-    val myReader = CharReader("hello people".toArray)
+    val myReader = CharReader("4hello people".toArray)
 
-    val stringLitParser = optimise(rep(letter))
+    val stringLitParser = optimise {
+      digit2Int.map(_ * 10)
+    }
 
     val Success(res, rest) = stringLitParser(myReader)
     println(res)

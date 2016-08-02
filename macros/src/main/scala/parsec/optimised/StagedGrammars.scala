@@ -71,8 +71,8 @@ trait StagedGrammars
      * eta-expanding.
      */
     case Mapped(g, f, t) => for (p <- stage(g))
-      yield p.map(t, t => q"$f($t)")
-      //yield p.map(t, t => inline(f, List(t)))
+      //yield p.map(t, t => q"$f($t)")
+      yield p.map(t, t => inline(f, List(t)))
 
     /**
      * If we see a named parser, staging it boils down to calling the new

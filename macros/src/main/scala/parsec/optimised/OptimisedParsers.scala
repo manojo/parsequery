@@ -18,7 +18,9 @@ trait OptimisedParsers extends CharParsers {
 
 }
 
-class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
+class OptimisedParsersImpl(val c: Context)
+    extends StagedGrammars
+    with ParsequeryTransform {
 
   import c.universe._
 

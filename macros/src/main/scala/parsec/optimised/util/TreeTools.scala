@@ -52,10 +52,17 @@ trait TreeTools {
 
   def inline(fun: c.Tree, args: List[c.Tree]): c.Tree = {
     import c.internal._, decorators._
-    assert(fun.tpe != null) //why?
+
+    /**
+     * We might receive untyped functions here, if
+     * they have been created using quotes
+     */
+    val tcheckedFun = c.typecheck(fun)
+    //assert(tcheckedFun.tpe != null) //why?
+    //val tcheckedFun = fun
 
     //assuming anon function
-    val q"(..$params) => $body" = fun
+    val q"(..$params) => $body" = tcheckedFun
 
     /**
      * create fresh names and symbols for each
@@ -71,7 +78,7 @@ trait TreeTools {
      * create valDefs which evaluate each of the args
      */
     val vals = syms.zip(args).map { case (sym, arg) =>
-      valDef(sym, changeOwner(arg, enclosingOwner, sym))
+      valDef(sym, c.internal.changeOwner(arg, enclosingOwner, sym))
     }
 
     val old2new = params.map(_.symbol).zip(syms).toMap
@@ -80,7 +87,7 @@ trait TreeTools {
      * perform the inlining itself
      */
     val inlined = {
-      changeOwner(body, fun.symbol, enclosingOwner)
+      c.internal.changeOwner(body, tcheckedFun.symbol, enclosingOwner)
       typingTransform(body)((tree, api) => tree match {
         case Ident(_) if old2new.contains(tree.symbol) =>
             api.typecheck(q"${old2new(tree.symbol)}")
@@ -89,9 +96,19 @@ trait TreeTools {
       })
     }
 
-    q"""
+    splice(q"""
       ..$vals
       $inlined
-    """
+    """)
+  }
+
+  /**
+   * inspired by https://gist.github.com/retronym/10640845#file-macro2-scala
+   * check out the gist for a detailed explanation of the technique
+   */
+  def splice(tree: c.Tree): c.Tree = {
+    import internal._, decorators._
+    tree.updateAttachment(macroutil.OrigOwnerAttachment(c.internal.enclosingOwner))
+    q"_root_.macroutil.Splicer.changeOwner($tree)"
   }
 }

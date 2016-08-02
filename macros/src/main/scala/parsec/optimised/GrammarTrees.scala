@@ -1,12 +1,14 @@
 package parsec.optimised
 
+import util.TreeTools
+
 import scala.reflect.macros.blackbox.Context
 
 /**
  * Contains macro-level trees representing grammars
  * along with lifting and unlifting for them
  */
-trait GrammarTrees {
+trait GrammarTrees { self: TreeTools =>
 
   val c: Context
   import c.universe._
