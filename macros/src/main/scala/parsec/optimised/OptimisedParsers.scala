@@ -130,6 +130,7 @@ class OptimisedParsersImpl(val c: Context)
      * transformation independently on each parser.
      * TODO: propagate from finalG to all others
      */
+//    val transformedGrammars = ruleMap
     val transformedGrammars: Map[TermName, ParserDecl] = {
       for ((name, ParserDecl(n, t, r, g)) <- ruleMap)
       yield (name -> ParserDecl(n, t, r, transform(g)))

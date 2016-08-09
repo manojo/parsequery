@@ -120,55 +120,68 @@ trait TreeTools {
    * Attention: we assume for now that the tree does not have too funky a shape
    * For instance (a + 2) + b + (a + 6) will not work as expected.
    */
-  def largestIndepApplication(a: Symbol, rest: List[Symbol])(t: c.Tree): Option[c.Tree] = {
+  def largestIndepApplication(a: Symbol, rest: List[Symbol])(tree: c.Tree): SymbolUsageInfo = {
+    type AllInfo = (Option[Tree], Boolean, Boolean)
     val existenceChecker = new VariableExistenceChecker(a, rest)
 
     /**
-     * The inner loop is only interested in function application trees
-     * At the top level we do check whether we have an Ident (see below)
-     * But at any inner point returning an Ident tree is futile
+     * Walks through a list of trees, and accumulates
+     * info on the connectedness of `a`
+     * only one of `t :: args` may be allowed
+     * to return a tree which has `(true, false)`.
      */
-    def loop(tree: c.Tree): Option[c.Tree] = tree match {
-      case Apply(Select(t, _), args) =>
-        /** if the property is satisfied we return the tree itself */
-        if (existenceChecker.satisfied(tree)) Some(tree)
-        else {
-          /**
-           * We must make sure that only one of `t :: args` satisfies the property
-           * in which case we return it.
-           */
-          val recursed = (t :: args).foldLeft[Option[c.Tree]](None) { (acc, elem) =>
-            loop(elem) match {
-              case None => acc
-              case res @ Some(_) =>
-                /**
-                 * if we already have a valid tree in the pipeline we
-                 * have too many already, so we can bail.
-                 */
-                //scalastyle:off return
-                if (acc.isDefined) return None
-                else res
-                //scalastyle:on return
-            }
-          }
-          recursed
+    def innerLoop(ls: List[Tree],
+                  tmpRes: Option[Tree],
+                  tmpSeenA: Boolean,
+                  tmpRest: Boolean): AllInfo = ls match {
+      case Nil => (tmpRes, tmpSeenA, tmpRest)
+      case x :: xs => loop(x) match {
+        /** only our sym has been seen */
+        case (Some(t), true, false) => (tmpSeenA, tmpRest) match {
+
+          /** Do we already hold a tree satisfying props? */
+          //scalastyle:off return
+          case (true, false) => return (None, true, false)
+          //scalastyle:on return
+
+          /** We don't, so let's keep this one */
+          case (_, _) => innerLoop(xs, Some(t), true, false)
         }
 
-      /**
-       * any other tree form is not tolerated for the moment
-       */
-      case _ => None
+        /** other syms are seen, that tree is useless */
+        case _ => innerLoop(xs, tmpRes, tmpSeenA, tmpRest)
+      }
     }
 
-    t match {
-      case i @ Ident(_) if (i.symbol == a) => Some(t)
-      case _ => loop(t)
+    def loop(tmpTree: c.Tree): AllInfo = {
+      val (seenA, seenRest) = existenceChecker.getExistenceInfo(tmpTree)
+
+      tmpTree match {
+        case Apply(Select(t, _), args) => (seenA, seenRest) match {
+          /**
+           * we only need inspect deeply if all syms are present
+           * specifically: only one of `t :: args` may be allowed
+           * to return a tree which has `(true, false)`.
+           */
+          case (true, true)      => innerLoop(t :: args, None, false, false)
+          case (seenA, seenRest) => (Some(tmpTree), seenA, seenRest)
+        }
+
+        case _ => (Some(tmpTree), seenA, seenRest)
+      }
+    }
+
+    loop(tree) match {
+      case (_, false, _)          => NotUsed
+      case (Some(t), true, false) => IndepComponent(t)
+      case _                      => NoInfo
     }
   }
 
   /**
    * Given tree `t`, sym `a` and syms `rest`, where `a` and `rest` are idents
    * does `t` contain `a`, and does it contain any of `rest`?
+   * Returns both flags
    */
   class VariableExistenceChecker(a: Symbol, rest: List[Symbol]) extends Traverser {
 
@@ -183,14 +196,14 @@ trait TreeTools {
       case _ => super.traverse(tree)
     }
 
-    def satisfied(tree: c.Tree): Boolean = {
+    def getExistenceInfo(tree: c.Tree): (Boolean, Boolean) = {
       /**
        * resetting flags so that we can reuse the same checker
        * many times
        */
       seenA = false; seenRest = false
       traverse(tree)
-      seenA && !seenRest
+      (seenA, seenRest)
     }
   }
 
@@ -218,4 +231,13 @@ trait TreeTools {
       case _ => super.traverse(tree)
     }
   }
+
+  /**
+   * An ADT representing info on a symbol in a function body
+   */
+  sealed abstract class SymbolUsageInfo
+  case object NotUsed extends SymbolUsageInfo
+  /** The independent component can't be an Ident */
+  case class IndepComponent(t: c.Tree) extends SymbolUsageInfo
+  case object NoInfo extends SymbolUsageInfo
 }

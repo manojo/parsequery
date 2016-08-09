@@ -92,80 +92,174 @@ trait ParsequeryTransform
     case ConcatRight(l, r, t) => ConcatRight(l, transformMap(r, f, u), u)
 
     /**
-     * We first focus on the simplest variant possible.
-     * We assume that `l` is not itself a concat.
-     *
-     * Step 1: analyse the body of `f` to identify (a unique) independent application on `l`,
-     * if any.
-     * Step 2: carry this application to its own function
-     * Step 3: replace the application's occurence in f by a value
+     * Step 1: find all pattern bindings in the pattern match syntax in `f`
+     * Step 2: find all independent applications of each binding, or dead codes thereof
+     * Step 3: transfer independent applications to their respective parsers
+     * Step 4: rewrite `f` and remove dead code
      * Recursively propagate transform as appropriate
      */
     case Concat(l, r, t) => f match {
-
-      case q"(..$params) => $body" => body match {
+      case q"($param) => $body" => body match {
 
         /** we are assuming only one case in the body */
         case q"$_ match { case $c1 }" => c1 match {
 
+          /**
+           * The pattern itself can have two forms:
+           *   - just a simple binding, in which case we can't modify anything
+           *   - a pair binding, in which case we might salvage from inspecting
+           *   the body
+           */
           case cq"$pat => $bdy" =>
 
-            /**
-             * We collect all binding symbols
-             * This is where we assume that l is not a concat: we expect
-             * `fst` to bind to it.
-             */
-            val fst :: rest = (new PatternBindings).inspect(pat)
+            /** Get all mappings of a grammar to a binding */
+            val mappings: Map[Grammar, Bind] = grammarBindingMappings(g, pat)
 
-            /**
-             * TODO: check if `fst` is used at all
-             */
-            largestIndepApplication(fst, rest)(bdy) match {
-              case Some(maybeApp) => maybeApp match {
-                /**
-                 * Only `l` is used. This means that we have
-                 * [[(l ~ r) map { case (a, b) => a }]]
-                 *
-                 * This is converted to [[l <~ r]]
-                 */
-                case Ident(_) => transform(ConcatLeft(l, r, t))
+            /** Get mappings from each Grammar to a possible Apply tree */
+            val indepApplications: Map[Grammar, SymbolUsageInfo] = {
+              val bindingSyms = mappings.values.map(_.symbol).toList
 
-                /**
-                 * Else we have a function application
-                 */
-                case app @ Apply(_, _) =>
+              for((grammar, binding) <- mappings) yield {
+                val app = largestIndepApplication(
+                  binding.symbol,
+                  bindingSyms diff List(binding.symbol)
+                )(bdy)
 
-                  val funArg = freshAnonVal("arg", l.tpe)
-                  /**
-                   * Does the appTransformed *need* to be a `typingTransform`?
-                   */
-                  val appTransformed = c.internal.typingTransform(app)((tree, api) => tree match {
-                    case Ident(_) if tree.symbol == fst =>
-                        api.typecheck(q"${funArg.symbol}")
-                    case _ =>
-                      api.default(tree)
-                  })
-                  val singledOutFunction = q"($funArg) => $appTransformed"
-
-                  /**
-                   * if app is as big as bdy itself then we have
-                   * [[(l ~ r) map { case (a, b) => f(a) }]]
-                   *
-                   * This is converted to [[l map f]] <~ [[r]]
-                   */
-                  if (app.symbol == bdy.symbol) {
-                    ConcatLeft(transform(Mapped(l, singledOutFunction, u)), transform(r), t)
-                  } else {
-                    Mapped(g, f, u)
-                  }
+                (grammar -> app)
               }
-
-              /** `fst` is strongly connected to other bindings in the pattern match */
-              case None => Mapped(g, f, u)
-
             }
 
-          case _ => println("matched no pattern"); Mapped(g, f, u)
+            /**
+             * helper functions to identify applications worth manipulating
+             */
+            def isApp(s: SymbolUsageInfo) = s match {
+              case IndepComponent(Apply(_, _)) => true
+              case _ => false
+            }
+
+            def isAppOrNotUsed(s: SymbolUsageInfo) = s match {
+              case IndepComponent(Apply(_, _)) => true
+              case NotUsed => true
+              case _ => false
+            }
+
+            def isNotUsed(s: SymbolUsageInfo) = s match {
+              case NotUsed => true
+              case _ => false
+            }
+
+            /** create, for each Apply, a separate function */
+            val newFunctions: Map[Grammar, (Tree, Type)] = for {
+              (grammar, indepApp) <- indepApplications if isApp(indepApp)
+              binding <- mappings.get(grammar)
+            } yield {
+
+              val IndepComponent(app @ Apply(_, _)) = indepApp
+              val funArg = freshAnonVal("arg", binding.tpe)
+              /** Does the appTransformed *need* to be a `typingTransform`?*/
+              val appTransformed = c.internal.typingTransform(app)(
+                (tree, api) => tree match {
+                  case Ident(_) if tree.symbol == binding.symbol =>
+                    api.typecheck(q"${funArg.symbol}")
+                  case _ =>
+                    api.default(tree)
+                }
+              )
+              val fun = (q"($funArg) => $appTransformed", app.tpe)
+              (grammar -> fun)
+            }
+
+            /**
+             * for each relevant grammar create a Mapped version of it
+             * We use Option[Mapped] to denote if a grammar is not used
+             * anymore
+             */
+            val oldAndNew: Map[Grammar, Option[Mapped]] = for {
+              (grammar, indepApp) <- indepApplications if isAppOrNotUsed(indepApp)
+            } yield {
+              val maybeMapped = indepApp match {
+                case IndepComponent(Apply(_, _)) =>
+                  for ((fun, tpe) <- newFunctions.get(grammar))
+                    yield Mapped(grammar, fun, tpe)
+                case NotUsed => None
+              }
+              (grammar -> maybeMapped)
+            }
+
+            /**
+             * in `bdy`, replace all occurrences of the applications with relevant symbol
+             * Since Map uses hashCode and co, and we need ref equality, we'll use
+             * a List and find with a predicate
+             */
+            val reverseMap: List[(Apply, Bind)] = (for {
+              (grammar, indepApp) <- indepApplications if isApp(indepApp)
+              binding <- mappings.get(grammar)
+            } yield {
+              val IndepComponent(app @ Apply(_, _)) = indepApp
+              (app, binding)
+            }).toList
+
+            val newBody = c.internal.typingTransform(bdy)((tree, api) => tree match {
+              case app @ Apply(_, _) =>
+
+                reverseMap.find { case (app2, _) => app == app2 } match {
+                  case None => api.default(tree)
+                  case Some((_, b @ Bind(_, _))) => api.typecheck(q"${b.symbol}")
+                }
+
+              case _ => api.default(tree)
+            })
+
+            val grammarReworked = swapOldForNew(g, oldAndNew)
+
+            /**
+             * rewrite the pattern match in order to remove dead patterns
+             */
+            val deadBindings: List[Symbol] = (for {
+              (grammar, binding) <- mappings
+              indepApp <- indepApplications.get(grammar) if isNotUsed(indepApp)
+            } yield binding.symbol).toList
+
+            val dcedPattern = eliminateDeadPatterns(pat, deadBindings)
+
+            /**
+             * If the new body is just an Ident we don't need it
+             */
+            val brandNewBody = newBody match {
+              case Ident(_) => transform(grammarReworked)
+              case _ =>
+                val funTransformed = c.internal.typingTransform(f)(
+                  (tree, api) =>
+                    if (tree == bdy) api.typecheck(newBody)
+                    else if (tree == param) {
+
+                      val ValDef(mods, name, tpt, rhs) = param
+
+                      /**
+                       * using the internal reflection library to create
+                       * a new valDef, with the same symbol as `param`
+                       */
+                      import c.universe.definitions._
+                      import c.internal._, decorators._
+                      val sym = param.symbol
+                      sym.setInfo(grammarReworked.tpe)
+                      val newVal = ValDef(mods, name, q"${grammarReworked.tpe}", rhs)
+                      newVal.setSymbol(sym)
+
+                      api.typecheck(newVal)
+
+                    } else if (tree == pat) dcedPattern match {
+                      /* nothing in the pattern is used in the body */
+                      case EmptyTree => api.typecheck(pq"_")
+                      case _ => api.typecheck(dcedPattern)
+
+                    } else api.default(tree)
+                )
+                Mapped(transform(grammarReworked), funTransformed, u)
+            }
+            brandNewBody
+
+          case _ => println("matched no pattern"); Mapped(transform(g), f, u)
         }
 
         case _ =>
@@ -178,7 +272,7 @@ trait ParsequeryTransform
           )
           println(showCode(f))
           println(showRaw(f))
-          Mapped(g, f, u)
+          Mapped(transform(g), f, u)
       }
 
       case _ =>
@@ -190,14 +284,72 @@ trait ParsequeryTransform
         )
         println(showCode(f))
         println(showRaw(f))
-        Mapped(g, f, u)
+        Mapped(transform(g), f, u)
     }
 
-
-
-
-
-    case _ => Mapped(g, f, u)
+    case _ => Mapped(transform(g), f, u)
   }
 
+  /**
+   * given a grammar and a tree that is a pattern match, returns
+   * a mapping of tree to binding. This is used for identifying
+   * which parsers are mapped on from a concat:
+   *
+   * Example: (a ~ b ~ c ~ d) map { case (((p1, p2), p3), p4) => ... }
+   * returns (a, p1), (b, p2), (c, p3), (d, p4)
+   *
+   * Example: (a ~ b ~ c ~ d) map { case ((p1, p3), p4) => ... }
+   * returns (a ~ b, p1), (c, p3), (d, p4)
+   */
+  def grammarBindingMappings(g: Grammar, pat: Tree): Map[Grammar, Bind] = (g, pat) match {
+    case (Concat(l, r, _), q"($lpat, $rpat)") =>
+      grammarBindingMappings(l, lpat) ++ grammarBindingMappings(r, rpat)
+    case (_, b @ Bind(_, _)) => Map(g -> b)
+    case _ => Map.empty[Grammar, Bind]
+  }
+
+  /**
+   * given old to new grammar mappings, yield a new grammar where the old is
+   * replaced with the new
+   */
+  def swapOldForNew(g: Grammar, oldAndNew: Map[Grammar, Option[Mapped]]): Grammar = g match {
+    case Concat(l, r, tpe) => oldAndNew.get(g) match {
+      case Some(None) => ConcatLeft(l, r, tpe)//TODO: convert into recogniser
+      case Some(Some(g2)) => g2
+      case _ =>
+        val (leftExists, rightExists) = (oldAndNew.get(l), oldAndNew.get(r))
+        (leftExists, rightExists) match {
+          case (Some(None), Some(Some(_))) =>
+            ConcatLeft(swapOldForNew(l, oldAndNew), swapOldForNew(r, oldAndNew), tpe)
+          case (Some(Some(_)), Some(None)) =>
+            ConcatRight(swapOldForNew(l, oldAndNew), swapOldForNew(r, oldAndNew), tpe)
+          case _ => Concat(swapOldForNew(l, oldAndNew), swapOldForNew(r, oldAndNew), tpe)
+        }
+    }
+
+    case _ => oldAndNew.get(g) match {
+      case Some(Some(g2)) => g2
+      case Some(None) => g//TODO: convert into recogniser
+      case _ => g
+    }
+  }
+
+  /**
+   * Given a pattern-match tree (i.e. `pat` in q"$pat => $body") and a
+   * list of dead bindings, returns a new tree devoid of those bindings
+   * We naturally
+   */
+  def eliminateDeadPatterns(pat: c.Tree, deadBindings: List[Symbol]): Tree = {
+    if (deadBindings.contains(pat.symbol)) EmptyTree
+    else pat match {
+      case q"($lpat, $rpat)" =>
+        (eliminateDeadPatterns(lpat, deadBindings), eliminateDeadPatterns(rpat, deadBindings)) match {
+          case (EmptyTree, EmptyTree) => EmptyTree
+          case (EmptyTree, r) => r
+          case (l, EmptyTree) => l
+          case (l, r) => q"($l, $r)"
+        }
+      case _ => pat
+    }
+  }
 }
