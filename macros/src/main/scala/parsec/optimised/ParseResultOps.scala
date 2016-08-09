@@ -31,7 +31,18 @@ trait ParseResultOps { self: ReaderOps with Zeroval =>
        */
       def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree): Tree = {
         self.apply(
-          (res, rest) => success(f(res), rest),
+          (res, rest) => {
+            /**
+             * We must compute the result at this point,
+             * and pass a reference to it.
+             */
+            val tmpResTerm = TermName(c.freshName("res"))
+            val tmpRes = q"$tmpResTerm"
+            q"""
+              val $tmpResTerm = ${f(res)}
+              ${success(tmpRes, rest)}
+            """
+          },
           failure
         )
       }

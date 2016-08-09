@@ -71,7 +71,6 @@ trait StagedGrammars
      * eta-expanding.
      */
     case Mapped(g, f, t) => for (p <- stage(g))
-      //yield p.map(t, t => q"$f($t)")
       yield p.map(t, t => inline(f, List(t)))
 
     /**
