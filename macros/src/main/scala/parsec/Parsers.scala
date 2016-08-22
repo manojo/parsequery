@@ -81,6 +81,10 @@ trait Parsers extends java.io.Serializable {
   def accept(e: Elem) = acceptIf(_ == e)
 
   def success[T](t: T): Parser[T] = Parser { in => Success(t, in) }
+  def opt[T](p: Parser[T]): Parser[Option[T]] = Parser { in => p(in) match {
+    case Success(t, rest) => Success(Some(t), rest)
+    case Failure(_, rest)    => Success(None, rest)
+  }}
 
   /**
    * An ADT for parsers
