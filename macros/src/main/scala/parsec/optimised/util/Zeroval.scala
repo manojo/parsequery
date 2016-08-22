@@ -20,6 +20,7 @@ trait Zeroval {
     if (typ =:= typeOf[scala.Char]) q"0"
     else if (typ =:= typeOf[scala.Int])  q"0"
     else if (typ =:= typeOf[scala.Unit]) q"()"
+    else if (typ =:= typeOf[scala.Double]) q"0.0"
     else q"null"
   }
 }

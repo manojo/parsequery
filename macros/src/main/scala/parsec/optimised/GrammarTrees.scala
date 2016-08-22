@@ -53,6 +53,7 @@ trait GrammarTrees { self: TreeTools =>
   case class PIdent(name: Ident) extends Grammar(name.tpe)
   case class SuccessGrammar(path: List[Tree], tpe2: Type, elem: Tree) extends Grammar(tpe2)
   case class Number(path: List[Tree]) extends Grammar(typeOf[Int])
+  case class DoubleGrammar(path: List[Tree]) extends Grammar(typeOf[Double])
   case class StringLiteral(path: List[Tree]) extends Grammar(typeOf[String])
 
   /* TODO: should desugar this later */
@@ -92,6 +93,7 @@ trait GrammarTrees { self: TreeTools =>
 
     case q"(..$p).number"        => Number(p)
     case q"(..$p).stringLiteral" => StringLiteral(p)
+    case q"(..$p).double"        => DoubleGrammar(p)
 
     case q"(..$p).accept(${arg: String})"     => AcceptStr(p, arg)
     case q"(..$p).success[${t: Type}]($elem)" => SuccessGrammar(p, t, elem)
@@ -127,6 +129,7 @@ trait GrammarTrees { self: TreeTools =>
     case SkipWs(p, t, g) => q"(..$p).skipWs[$t]($g)"
 
     case Number(p) => q"(..$p).number"
+    case DoubleGrammar(p) => q"(..$p).double"
     case StringLiteral(p) => q"(..$p).stringLiteral"
   }
 }

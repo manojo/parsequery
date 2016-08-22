@@ -44,11 +44,7 @@ object Test extends OptimisedParsers {
 
     case class Bla(a: Int, b: Int)
 
-    val stringLitParser = optimise {
-      ((digit2Int ~ digit2Int) ~ digit2Int).map {
-        case ((a, b), c) => (a + 1) + (c + 2)
-      }
-    }
+    val stringLitParser = optimise { double }
 
     val Success(res, rest) = stringLitParser(myReader)
     println(res)

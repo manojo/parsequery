@@ -145,4 +145,29 @@ class CharParsersSuite
       expectedPos = 5
     )
   }
+
+  test("double parsing") {
+
+    checkFailure(double, CharReader("greetin".toArray))
+    checkFailure(double, CharReader("-.".toArray))
+    checkSuccess(double, CharReader("12345".toArray))(
+      expected = 12345.0,
+      expectedPos = "12345".length
+    )
+
+    checkSuccess(double, CharReader("12.345".toArray))(
+      expected = 12.345,
+      expectedPos = "12.345".length
+    )
+
+    checkSuccess(double, CharReader("-.12345e-6".toArray))(
+      expected = -.12345e-6,
+      expectedPos = "-.12345e-6".length
+    )
+
+    checkSuccess(double, CharReader("-21312.12345e+125".toArray))(
+      expected = -21312.12345e+125,
+      expectedPos = "-21312.12345e+125".length
+    )
+  }
 }

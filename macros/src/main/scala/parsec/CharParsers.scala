@@ -27,6 +27,43 @@ trait CharParsers extends Parsers with RepetitionParsers {
     repFold(digit2Int).fold[Int](d, (acc, n) => acc * 10 + n)
   }
 
+  def negNumber: Parser[Int] = (opt(accept('-')) ~ number) map {
+    case (Some(_), num) => -num
+    case (_, num) => num
+  }
+
+  /**
+   * parses a double, but specialised version
+   * we find the interval that the double spawns
+   * and call .toDouble on the subSequence for
+   * that interval. We catch the exception to propagate a failure
+   *
+   * -?(\d+(\.\d*)?|\d*\.\d+)([eE][+-]?\d+)?[fFdD]?
+   * TODO, rethink implementation and make it better!
+   */
+  def double: Parser[Double] = Parser { in =>
+    import scala.annotation.tailrec
+
+    var curIn = in
+    if (!curIn.atEnd && curIn.first == '-') { curIn = curIn.rest }
+    while (!curIn.atEnd && curIn.first.isDigit) { curIn = curIn.rest }
+    if (!curIn.atEnd && curIn.first == '.') { curIn = curIn.rest }
+    while (!curIn.atEnd && curIn.first.isDigit) { curIn = curIn.rest }
+    if (!curIn.atEnd && curIn.first == 'e') {
+      curIn = curIn.rest
+      if (!curIn.atEnd && (curIn.first == '+' || curIn.first == '-')) { curIn = curIn.rest }
+      while (!curIn.atEnd && curIn.first.isDigit) { curIn = curIn.rest }
+    }
+
+    if (curIn.pos == in.pos) Failure("could not parse a double", in)
+    else try {
+      val res = in.source.subSequence(in.pos, curIn.pos).toString.toDouble
+      Success(res, curIn)
+    } catch {
+      case _ => Failure("could not parse a double", in)
+    }
+  }
+
   def ws = repFold(singleSpace | CRLF)
   val ignoreWs = ws.toSkipper
 
