@@ -147,6 +147,8 @@ class OptimisedParserSuite
 
     val emptyStringLit = "\"\"".toArray
     val aQuote = "\"Dr. Livingstone, I presume?\"".toArray
+    val quotesinQuotes =
+      """"And then he said, \"Bwoy, you want something!\"."""".toArray
 
     val stringLitParser = optimise(stringLiteral)
 
@@ -159,6 +161,12 @@ class OptimisedParserSuite
       expected = "Dr. Livingstone, I presume?",
       expectedPos = aQuote.length
     )
+
+    checkSuccess(stringLitParser, CharReader(quotesinQuotes))(
+      expected = """And then he said, "Bwoy, you want something!".""",
+      expectedPos = quotesinQuotes.length
+    )
+
   }
 
   test("repsep works") {

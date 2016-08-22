@@ -83,6 +83,8 @@ class CharParsersSuite
 
     val emptyStringLit = "\"\"".toArray
     val aQuote = "\"Dr. Livingstone, I presume?\"".toArray
+    val quotesinQuotes =
+      """"And then he said, \"Bwoy, you want something!\"."""".toArray
 
     checkSuccess(stringLiteral, CharReader(emptyStringLit))(
       expected = "",
@@ -93,6 +95,12 @@ class CharParsersSuite
       expected = "Dr. Livingstone, I presume?",
       expectedPos = aQuote.length
     )
+
+    checkSuccess(stringLiteral, CharReader(quotesinQuotes))(
+      expected = """And then he said, "Bwoy, you want something!".""",
+      expectedPos = quotesinQuotes.length
+    )
+
   }
 
   test("repsep works") {

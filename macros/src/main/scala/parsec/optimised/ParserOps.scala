@@ -188,13 +188,15 @@ trait ParserOps { self: ParseResultOps with ReaderOps with Zeroval =>
   def stringLiteral = {
     import scala.collection.mutable.StringBuilder
 
+    def legitCharacter = (accept('\\') ~> acceptIf(typeOf[Char], elem => q"true")).or(
+      typeOf[Char], acceptIf(typeOf[Char], c => q"""$c != '"'""")
+    )
+
     (accept('"') ~>
-      fromParser(
-        typeOf[Char],
-        acceptIf(typeOf[Char], c => q"""$c != '"'""")).fold(
-          typeOf[StringBuilder],
-          q"scala.collection.mutable.StringBuilder.newBuilder",
-          (acc, elem) => q"$acc.append($elem)"
+      fromParser(typeOf[Char], legitCharacter).fold(
+        typeOf[StringBuilder],
+        q"scala.collection.mutable.StringBuilder.newBuilder",
+        (acc, elem) => q"$acc.append($elem)"
       )
     <~ accept('"')).map(typeOf[String], (sbuf => q"$sbuf.toString"))
   }

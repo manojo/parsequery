@@ -75,8 +75,12 @@ trait CharParsers extends Parsers with RepetitionParsers {
    * parses a simple string literal, does not handle "weird" characters yet.
    * weird characters include much of unicode (stuff that starts with \\u???)
    */
-  def stringLiteral: Parser[String] =
-    accept('\"') ~> repFold(acceptIf(_ != '\"')).toStringParser <~ accept('\"')
+  def stringLiteral: Parser[String] = (accept('"') ~>
+    repFold(
+      (accept('\\') ~> acceptIf(_ => true)) |
+      acceptIf(_ != '"')
+    ).toStringParser
+  <~ accept('"'))
 
 
   /**
