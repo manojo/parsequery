@@ -1,4 +1,4 @@
-package parsequery
+/*package parsequery
 
 import org.scalameter.api._
 import org.scalameter.picklers.Implicits._
@@ -69,3 +69,4 @@ object ParsequeryBenchmark extends Bench.ForkedTime with JSONParser {
   benchmark("GeneralParser", runGeneralParser)
   benchmark("SpecializedParser", runSpecializedParser)
 }
+*/

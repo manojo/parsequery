@@ -322,10 +322,15 @@ trait FastParseBooleansBenchmark extends FastParseBenchmarkHelper {
 }
 
 
+//scalastyle:off line.size.limit
 /**
  * a booleans list parser, written in `FastParse`. Also uses a JSON
  * parser instead of a dedicated bool parser
+ * Parser borrowed from
+ * https://github.com/lihaoyi/fastparse/blob/master/fastparse/shared/src/test/scala/fastparse/JsonTests.scala
  */
+ //scalastyle:on line.size.limit
+
 trait FastParseJSONBooleansBenchmark extends FastParseBenchmarkHelper {
   import BooleansData._
   import fastparse.all._
