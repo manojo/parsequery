@@ -73,6 +73,13 @@ trait ParsequeryTransform
      */
     case Mapped(g1, f2, u2) =>
 
+      println()
+      println("Mapped(Mapped(....))")
+      println("before")
+      println(showRaw(f))
+      println(showRaw(f2))
+      println()
+
       val argTerm = TermName(c.freshName("arg"))
       val arg = q"$argTerm"
 
@@ -80,6 +87,9 @@ trait ParsequeryTransform
       val inlined = inline(f, List(inlinedf2))
 
       val composed = q"($argTerm: ${g1.tpe}) => $inlined"
+
+      println("after")
+      println(showRaw(composed))
 
       transformMap(g1, composed, u)
 

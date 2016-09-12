@@ -70,6 +70,7 @@ object TweetParser extends JSONParsers {
     followRequestSent: Option[Boolean]
   )
 
+//  val tweetsParser = optimise {
   def bool: Parser[Boolean] = {
     accept("true").map(_ => true) |
     accept("false").map(_ => false)
@@ -87,7 +88,7 @@ object TweetParser extends JSONParsers {
 
   def nullOrInt: Parser[Option[Int]] = {
     accept("null").map(_ => None) |
-    negNumber.map(s => Some(s))
+    double.map(s => Some(s.toInt))
   }
 
   def nullOrLong: Parser[Option[Long]] = {
@@ -320,11 +321,14 @@ object TweetParser extends JSONParsers {
     repsep(tweetParser, skipWs(accept(',')))
     <~ skipWs(accept(']')))
 
+//  tweetsParser
+// }
+
   def main(args: Array[String]): Unit = {
     println("greetings lion, this one a tweet parser")
 
     import scala.io.Source
-    val fileName = "data/tweets.json"
+    val fileName = "data/tweets-600.json"
     val fileContent = Source.fromFile(fileName).mkString
 
     //scalastyle:off line.size.limit
@@ -472,7 +476,6 @@ object TweetParser extends JSONParsers {
     }"""
     //scalastyle:on line.size.limit
 
-    println(tweetSource.subSequence(2400, 2900))
     val myReader = CharReader(fileContent.toArray)
     //val myReader = CharReader(tweetSource.toArray)
     val Success(res, rest) = tweetsParser(myReader)

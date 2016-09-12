@@ -1,5 +1,4 @@
 package parsec
-
 import parsec.optimised.OptimisedParsers
 
 object TestFastParse {
@@ -42,9 +41,9 @@ object Test extends OptimisedParsers {
     //val myReader = CharReader(fileContent.toArray)
     val myReader = CharReader("421hello people".toArray)
 
-    case class Bla(a: Int, b: Int)
-
-    val stringLitParser = optimise { double }
+    val stringLitParser = optimise {
+      opt(digit2Int) ~ digit2Int//.map { case (a, b) => a }
+    }
 
     val Success(res, rest) = stringLitParser(myReader)
     println(res)
