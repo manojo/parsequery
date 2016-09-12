@@ -75,7 +75,7 @@ A snapshot is available on Sonatype. To use it with SBT, add the following lines
 to your build:
 
 ```scala
-libraryDependencies += "com.github.begeric" % "fastparsers_2.11" % "0.1-SNAPSHOT"
+libraryDependencies += "com.github.manojo" % "parsequery_2.11" % "0.1-SNAPSHOT"
 resolvers += Resolver.sonatypeRepo("snapshots")
 ```
 

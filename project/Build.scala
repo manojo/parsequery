@@ -5,6 +5,7 @@ object ParsequeryBuild extends Build {
   scalaVersion := "2.11.8"
 
   def commonSettings = Seq(
+    organization := "com.github.manojo",
     version := "0.1-SNAPSHOT",
     scalaVersion := "2.11.8",
     scalacOptions += "-deprecation",
@@ -23,7 +24,7 @@ object ParsequeryBuild extends Build {
       "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
       "Sonatype OSS Releases" at "https://oss.sonatype.org/content/repositories/releases"
     )
-  )
+  ) ++ publishSettings
 
   lazy val Benchmark = config("bench") extend Test
 
@@ -31,11 +32,11 @@ object ParsequeryBuild extends Build {
     "root",
     file("."),
     settings = commonSettings ++ Seq(
-      run <<= run in Compile in core)
-  ) aggregate(macros, core)
+      run <<= run in Compile in parsequery)
+  ) aggregate(parsequery, examples)
 
-  lazy val macros: Project = Project(
-    id = "macros",
+  lazy val parsequery: Project = Project(
+    id = "parsequery",
     base = file("macros"),
     settings = commonSettings ++ Seq(
       libraryDependencies ++= Seq(
@@ -51,22 +52,22 @@ object ParsequeryBuild extends Build {
       parallelExecution in Benchmark := false,
       parallelExecution in Test := false,
       logBuffered := false
-    )
+    ) ++ publishableSettings
   ) configs(
     Benchmark
   ) settings(
     inConfig(Benchmark)(Defaults.testSettings): _*
   )
 
-  lazy val core: Project = Project(
-    id = "core",
+  lazy val examples: Project = Project(
+    id = "parsequery_examples",
     base = file("core"),
-    dependencies = Seq(macros),
+    dependencies = Seq(parsequery),
     settings = commonSettings ++ Seq(
       // include the macro classes and resources in the main jar
-      mappings in (Compile, packageBin) ++= mappings.in(macros, Compile, packageBin).value,
+      mappings in (Compile, packageBin) ++= mappings.in(parsequery, Compile, packageBin).value,
       // include the macro sources in the main source jar
-      mappings in (Compile, packageSrc) ++= mappings.in(macros, Compile, packageSrc).value
+      mappings in (Compile, packageSrc) ++= mappings.in(parsequery, Compile, packageSrc).value
     )
   )
 
