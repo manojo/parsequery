@@ -28,11 +28,70 @@ trait StagedGrammars
    * named parsers with their modified names
    */
   def stage(g: Grammar)(implicit oldToNew: Map[Name, TermName]): Option[Parser] = g match {
-    case a @ AcceptIf(_, p)  => Some(acceptIf(a.t, p))
+    case a @ AcceptIf(_, p)  => Some(acceptIf(a.tpe, p))
     case AcceptStr(_, s) => Some(acceptStr(s))
     case SuccessGrammar(_, t, elem) =>
       Some(mkParser(t, { in => mkSuccess(t, elem, in) }))
     case Number(_) => Some(number)
+
+    /**
+     * the double parser, temporarily implemented here.
+     * TODO: port this into ParserOps soon enough
+     */
+    case DoubleGrammar(path) => Some(
+      mkParser(typeOf[Double], { in => new ParseResult(typeOf[Double]) {
+          def apply(success: (Tree, CharReader) => Tree,
+                    failure: CharReader => Tree) = {
+
+            val cReader = q"${in.toCharReader}"
+            val parsed = q"$path.double(cReader)"
+
+            val tmpResTerm = TermName(c.freshName("tmpRes"))
+            val tmpRes = q"$tmpResTerm"
+
+            val tmpSourceTerm = TermName(c.freshName("tmpSource"))
+            val tmpSource = q"$tmpSourceTerm"
+
+            val tmpPosTerm = TermName(c.freshName("tmpPos"))
+            val tmpPos = q"$tmpPosTerm"
+
+            val isSuccessTerm = TermName(c.freshName("success"))
+            val isSuccess = q"$isSuccessTerm"
+
+            val inputTerm = TermName(c.freshName("input"))
+            val input = q"$inputTerm"
+
+            val resTerm = TermName(c.freshName("doubleRes"))
+            val res = q"$resTerm"
+
+            val restTerm = TermName(c.freshName("rest"))
+            val rest = q"$restTerm"
+
+            q"""
+              var $isSuccessTerm: Boolean = false
+              var $tmpSourceTerm: Array[Char] = null
+              var $tmpPosTerm: Int = 0
+              var $tmpResTerm: Double = ${zeroValue(typeOf[Double])}
+
+              val $inputTerm = ${in.toCharReader}
+              (..$path).double($input) match {
+                case Success($resTerm, $restTerm) =>
+                  $tmpSource = $rest.source; $tmpPos = $rest.pos; $tmpRes = $res
+                  $isSuccess = true
+
+                case Failure(_, $restTerm) =>
+                  $tmpSource = $rest.source; $tmpPos = $rest.pos
+              }
+
+            if ($isSuccess) ${success(tmpRes, mkCharReader(tmpSource, tmpPos))}
+            else ${failure(mkCharReader(tmpSource, tmpPos))}
+          """
+          }
+        }}
+        )
+
+    )
+
     case StringLiteral(_) => Some(stringLiteral)
 
     /** TODO: should this be desugared before showing up here? */
@@ -60,6 +119,8 @@ trait StagedGrammars
       rp <- stage(r)
     } yield (lp.or(t, rp))
 
+    case Opt(g) => for (f <- stage(g)) yield opt(f)
+
     case Repsep(g, sep, t, u) => for {
       lp <- stage(g)
       rp <- stage(sep)
@@ -71,8 +132,7 @@ trait StagedGrammars
      * eta-expanding.
      */
     case Mapped(g, f, t) => for (p <- stage(g))
-      yield p.map(t, t => q"$f($t)")
-      //yield p.map(t, t => inline(f, List(t)))
+      yield p.map(t, t => inline(f, List(t)))
 
     /**
      * If we see a named parser, staging it boils down to calling the new

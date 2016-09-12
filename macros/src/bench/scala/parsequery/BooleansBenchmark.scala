@@ -259,7 +259,7 @@ trait BooleansJSONBenchmark extends ParsequeryBenchmarkHelper {
   sealed abstract class JSValue
   case class JSObject(dict: List[(String, JSValue)]) extends JSValue
   case class JSArray(arr: List[JSValue]) extends JSValue
-  case class JSDouble(d: Int) extends JSValue
+  case class JSDouble(d: Double) extends JSValue
   case class JSString(s: String) extends JSValue
   case class JSBool(b: Boolean) extends JSValue
   case object JSNull extends JSValue
@@ -270,7 +270,7 @@ trait BooleansJSONBenchmark extends ParsequeryBenchmarkHelper {
       obj |
       arr |
       stringLiteral.map(x => JSString(x)) |
-      number.map(x => JSDouble(x)) |
+      double.map(x => JSDouble(x)) |
       accept("null").map(_ => JSNull) |
       accept("true").map(_ => JSBool(true)) |
       accept("false").map(_ => JSBool(false))
@@ -322,10 +322,15 @@ trait FastParseBooleansBenchmark extends FastParseBenchmarkHelper {
 }
 
 
+//scalastyle:off line.size.limit
 /**
  * a booleans list parser, written in `FastParse`. Also uses a JSON
  * parser instead of a dedicated bool parser
+ * Parser borrowed from
+ * https://github.com/lihaoyi/fastparse/blob/master/fastparse/shared/src/test/scala/fastparse/JsonTests.scala
  */
+ //scalastyle:on line.size.limit
+
 trait FastParseJSONBooleansBenchmark extends FastParseBenchmarkHelper {
   import BooleansData._
   import fastparse.all._

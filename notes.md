@@ -41,3 +41,18 @@ Alternatives tried, for parsing a sequence of booleans:
   -
 
 ---->
+
+  - should be easy to factor out some parsers example"
+
+  The data `"name": "SportsCenter"` and
+  `"screen_name": "SportsCenter"` should be parse-able
+  with a parser as follows:
+
+      def kvStringParser(s: String) = acceptStr(s) ~> skipWs(accept(':')) ~> stringLiteral
+      ...
+
+  For now the `optimise` macro does not allow for parsers which take parameters. Should think about how to integrate
+  these, and how they are inlined etc.
+
+
+

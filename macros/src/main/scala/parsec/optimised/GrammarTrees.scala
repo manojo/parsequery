@@ -1,12 +1,14 @@
 package parsec.optimised
 
+import util.TreeTools
+
 import scala.reflect.macros.blackbox.Context
 
 /**
  * Contains macro-level trees representing grammars
  * along with lifting and unlifting for them
  */
-trait GrammarTrees {
+trait GrammarTrees { self: TreeTools =>
 
   val c: Context
   import c.universe._
@@ -21,25 +23,26 @@ trait GrammarTrees {
   /* TODO: this is a bit hardcoded */
   val realElemType = typeOf[OptimisedParsers#Elem]
 
-  abstract class Grammar(val t: Type)
+  abstract class Grammar(val tpe: Type)
 
   /** combinators */
-  case class Mapped(g: Grammar, f: Tree, t2: Type) extends Grammar(t2)
+  case class Mapped(g: Grammar, f: Tree, tpe2: Type) extends Grammar(tpe2)
 
-  case class Concat(l: Grammar, r: Grammar, t2: Type)
-    extends Grammar(appliedType(typeOf[Tuple2[_, _]], List(l.t, t2)))
-  case class ConcatLeft(l: Grammar, r: Grammar, t2: Type) extends Grammar(l.t)
-  case class ConcatRight(l: Grammar, r: Grammar, t2: Type) extends Grammar(t2)
-  case class Or(l: Grammar, r: Grammar, t2: Type) extends Grammar(t2)
+  case class Concat(l: Grammar, r: Grammar, tpe2: Type)
+    extends Grammar(appliedType(typeOf[Tuple2[_, _]], List(l.tpe, tpe2)))
+  case class ConcatLeft(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(l.tpe)
+  case class ConcatRight(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(tpe2)
+  case class Or(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(tpe2)
+  case class Opt(g: Grammar) extends Grammar(appliedType(typeOf[Option[_]], List(g.tpe)))
   /**
    * we actually want the original tree
    * only the transformation phase will work on creating a new one
    * if needed
    */
-  case class Rep(g: Grammar, t2: Type)
-    extends Grammar(appliedType(typeOf[List[_]], t2))
-  case class Repsep(g: Grammar, g2: Grammar, t2: Type, u: Type)
-    extends Grammar(appliedType(typeOf[List[_]], t2))
+  case class Rep(g: Grammar, tpe2: Type)
+    extends Grammar(appliedType(typeOf[List[_]], tpe2))
+  case class Repsep(g: Grammar, g2: Grammar, tpe2: Type, u: Type)
+    extends Grammar(appliedType(typeOf[List[_]], tpe2))
 
   //case class RepFold(g: Grammar, t2: Type)(z: Tree, comb: Tree) extends Grammar
 
@@ -49,12 +52,13 @@ trait GrammarTrees {
   case class AcceptStr(path: List[Tree], s: String)
     extends Grammar(typeOf[String])
   case class PIdent(name: Ident) extends Grammar(name.tpe)
-  case class SuccessGrammar(path: List[Tree], t2: Type, elem: Tree) extends Grammar(t2)
+  case class SuccessGrammar(path: List[Tree], tpe2: Type, elem: Tree) extends Grammar(tpe2)
   case class Number(path: List[Tree]) extends Grammar(typeOf[Int])
+  case class DoubleGrammar(path: List[Tree]) extends Grammar(typeOf[Double])
   case class StringLiteral(path: List[Tree]) extends Grammar(typeOf[String])
 
   /* TODO: should desugar this later */
-  case class SkipWs(path: List[Tree], t2: Type, g: Grammar) extends Grammar(t2)
+  case class SkipWs(path: List[Tree], tpe2: Type, g: Grammar) extends Grammar(tpe2)
 
   /**
    * Liftable and unliftable instances of a grammar
@@ -69,6 +73,7 @@ trait GrammarTrees {
     case q"$_.rep[${t: Type}](${g: Grammar})" => Rep(g, t)
     case q"$_.repsep[${t: Type}, ${u: Type}](${g: Grammar}, ${sep: Grammar})" =>
       Repsep(g, sep, t, u)
+    case q"$_.opt[${t: Type}](${g: Grammar})" => Opt(g)
 
     /** base parsers */
     case q"(..$p).acceptIf($f)"         => AcceptIf(p, elem => q"$f($elem)")
@@ -90,6 +95,7 @@ trait GrammarTrees {
 
     case q"(..$p).number"        => Number(p)
     case q"(..$p).stringLiteral" => StringLiteral(p)
+    case q"(..$p).double"        => DoubleGrammar(p)
 
     case q"(..$p).accept(${arg: String})"     => AcceptStr(p, arg)
     case q"(..$p).success[${t: Type}]($elem)" => SuccessGrammar(p, t, elem)
@@ -113,6 +119,7 @@ trait GrammarTrees {
     case Or(l, r, t) => q"$l |[$t] $r"
     case Rep(g, t) => q"rep[$t]($g)"
     case Repsep(g, sep, t, u) => q"repsep[$t, $u]($g, $sep)"
+    case Opt(g) => q"opt[${g.tpe}]($g)"
 
     /** base parsers */
     case AcceptIf(p, pred) =>
@@ -125,6 +132,7 @@ trait GrammarTrees {
     case SkipWs(p, t, g) => q"(..$p).skipWs[$t]($g)"
 
     case Number(p) => q"(..$p).number"
+    case DoubleGrammar(p) => q"(..$p).double"
     case StringLiteral(p) => q"(..$p).stringLiteral"
   }
 }

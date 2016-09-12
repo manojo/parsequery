@@ -188,16 +188,20 @@ trait ParserOps { self: ParseResultOps with ReaderOps with Zeroval =>
   def stringLiteral = {
     import scala.collection.mutable.StringBuilder
 
+    def legitCharacter = (accept('\\') ~> acceptIf(typeOf[Char], elem => q"true")).or(
+      typeOf[Char], acceptIf(typeOf[Char], c => q"""$c != '"'""")
+    )
+
     (accept('"') ~>
-      fromParser(
-        typeOf[Char],
-        acceptIf(typeOf[Char], c => q"""$c != '"'""")).fold(
-          typeOf[StringBuilder],
-          q"scala.collection.mutable.StringBuilder.newBuilder",
-          (acc, elem) => q"$acc.append($elem)"
+      fromParser(typeOf[Char], legitCharacter).fold(
+        typeOf[StringBuilder],
+        q"scala.collection.mutable.StringBuilder.newBuilder",
+        (acc, elem) => q"$acc.append($elem)"
       )
     <~ accept('"')).map(typeOf[String], (sbuf => q"$sbuf.toString"))
   }
+
+  //def double =
 
   /**
    * a `FoldParser` represents a ``late'' repetition parser
@@ -297,4 +301,54 @@ trait ParserOps { self: ParseResultOps with ReaderOps with Zeroval =>
       }})
     }
   }
+
+  /**
+   * The `opt` combinator
+   */
+  def opt(p: Parser) = {
+    val optType = appliedType(typeOf[Option[_]], List(p.elemType))
+
+    val isSuccessTerm = TermName(c.freshName("success"))
+    val isSuccess = q"$isSuccessTerm"
+
+    val sourceTerm = TermName(c.freshName("source"))
+    val source = q"$sourceTerm"
+
+    val tmpPosTerm = TermName(c.freshName("tmpPos"))
+    val tmpPos = q"$tmpPosTerm"
+
+    val tmpResTerm = TermName(c.freshName("tmpRes"))
+    val tmpRes = q"$tmpResTerm"
+
+    mkParser(optType, { in => new ParseResult(optType) {
+
+      val resultApplied = p(in).apply(
+        (res, rest) => q"""
+          $isSuccess = true
+          $tmpRes = $res
+          $source = ${rest.getSource}
+          $tmpPos = ${rest.getPos}
+        """,
+        (rest) => q"""
+          $source = ${rest.getSource}
+          $tmpPos = ${rest.getPos}
+        """
+      )
+
+      val successApplied = mkSuccess(optType, q"Some($tmpRes)", mkCharReader(source, tmpPos))
+      val nonSuccessApplied = mkSuccess(optType, q"None", mkCharReader(source, tmpPos))
+
+      def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree) = q"""
+        var $isSuccessTerm: Boolean = false
+        var $tmpResTerm: ${p.elemType} = ${zeroValue(p.elemType)}
+        var $sourceTerm: Array[Char] = ${in.getSource}
+        var $tmpPosTerm: Int = ${in.getPos}
+
+        $resultApplied
+
+        if ($isSuccess) ${successApplied.apply(success, failure)}
+        else            ${nonSuccessApplied.apply(success, failure)}
+      """
+    }})
+ }
 }

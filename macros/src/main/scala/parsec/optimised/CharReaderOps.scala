@@ -35,6 +35,7 @@ trait ReaderOps {
     def getPos = self.apply((_, p) => p)
 
     def toCharReader: Tree = self.apply {
+      //(source, pos) => q"CharReader(${source.symbol}, ${pos.symbol})"
       (source, pos) => q"CharReader($source, $pos)"
     }
   }

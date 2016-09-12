@@ -18,7 +18,9 @@ trait OptimisedParsers extends CharParsers {
 
 }
 
-class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
+class OptimisedParsersImpl(val c: Context)
+    extends StagedGrammars
+    with ParsequeryTransform {
 
   import c.universe._
 
@@ -118,13 +120,33 @@ class OptimisedParsersImpl(val c: Context) extends StagedGrammars {
       }
     ).toMap
 
+    /**** Logging ****/
+    println("Grammars before parsequery phase")
+    for ((_, ParserDecl(_, _, _, g)) <- ruleMap) println(g)
+
     /**
-     * we first stage each parser we see, i.e.
+     * We transform each parser according to the
+     * parsequery transform rules. For now we perform the
+     * transformation independently on each parser.
+     * TODO: propagate from finalG to all others
+     */
+//    val transformedGrammars = ruleMap
+    val transformedGrammars: Map[TermName, ParserDecl] = {
+      for ((name, ParserDecl(n, t, r, g)) <- ruleMap)
+      yield (name -> ParserDecl(n, t, r, transform(g)))
+    }
+
+    /**** Logging ****/
+    println("Grammars AFTER parsequery phase")
+    for ((_, ParserDecl(_, _, _, g)) <- transformedGrammars) println(g)
+
+    /**
+     * we finally stage each parser we see, i.e.
      * Convert a Parser (Rep[Input => ParseResult]) into
      * a Rep[Input] => Rep[ParseResult]
      */
     val stagedParsers: Map[TermName, Option[Parser]] = {
-      for ((name, ParserDecl(_, _, _, g)) <- ruleMap)
+      for ((name, ParserDecl(_, _, _, g)) <- transformedGrammars)
       yield (name -> stage(g)(oldToNew))
     }
 

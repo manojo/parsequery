@@ -31,7 +31,18 @@ trait ParseResultOps { self: ReaderOps with Zeroval =>
        */
       def apply(success: (Tree, CharReader) => Tree, failure: CharReader => Tree): Tree = {
         self.apply(
-          (res, rest) => success(f(res), rest),
+          (res, rest) => {
+            /**
+             * We must compute the result at this point,
+             * and pass a reference to it.
+             */
+            val tmpResTerm = TermName(c.freshName("res"))
+            val tmpRes = q"$tmpResTerm"
+            q"""
+              val $tmpResTerm = ${f(res)}
+              ${success(tmpRes, rest)}
+            """
+          },
           failure
         )
       }
@@ -49,26 +60,6 @@ trait ParseResultOps { self: ReaderOps with Zeroval =>
     }
 
     def orElse(t: Type, that: ParseResult) = new ParseResult(t) {
-
-//      def apply[X: Typ](
-//        success: (Rep[T], Rep[Input]) => Rep[X],
-//        failure: Rep[Input] => Rep[X]): Rep[X] =  {
-//
-//        var isSuccess = unit(false)
-//        var value = zeroVal[T]
-//        var rdr = zeroVal[Input]
-//
-//        val successK = (t: Rep[T], rest: Rep[Input]) => {
-//          isSuccess = unit(true)
-//          value = t
-//          rdr = rest
-//        }
-//        val failK = (rest: Rep[Input]) => { rdr = rest }
-//        self.apply(successK, failK)
-//
-//        if (isSuccess) mkSuccess(value, rdr)
-//        else           that
-//      }
 
       val isSuccessTerm = TermName(c.freshName("success"))
       val isSuccess = q"$isSuccessTerm"

@@ -147,6 +147,8 @@ class OptimisedParserSuite
 
     val emptyStringLit = "\"\"".toArray
     val aQuote = "\"Dr. Livingstone, I presume?\"".toArray
+    val quotesinQuotes =
+      """"And then he said, \"Bwoy, you want something!\"."""".toArray
 
     val stringLitParser = optimise(stringLiteral)
 
@@ -159,6 +161,12 @@ class OptimisedParserSuite
       expected = "Dr. Livingstone, I presume?",
       expectedPos = aQuote.length
     )
+
+    checkSuccess(stringLitParser, CharReader(quotesinQuotes))(
+      expected = """And then he said, "Bwoy, you want something!".""",
+      expectedPos = quotesinQuotes.length
+    )
+
   }
 
   test("repsep works") {
@@ -208,40 +216,80 @@ class OptimisedParserSuite
     )
   }
 
+  test("double parsing works") {
+    val doubleOpti = optimise(double)
+    checkFailure(doubleOpti, CharReader("greetin".toArray))
+    checkFailure(doubleOpti, CharReader("-.".toArray))
+    checkSuccess(doubleOpti, CharReader("12345".toArray))(
+      expected = 12345.0,
+      expectedPos = "12345".length
+    )
+
+    checkSuccess(doubleOpti, CharReader("12.345".toArray))(
+      expected = 12.345,
+      expectedPos = "12.345".length
+    )
+
+    checkSuccess(doubleOpti, CharReader("-.12345e-6".toArray))(
+      expected = -.12345e-6,
+      expectedPos = "-.12345e-6".length
+    )
+
+    checkSuccess(doubleOpti, CharReader("-21312.12345e+125".toArray))(
+      expected = -21312.12345e+125,
+      expectedPos = "-21312.12345e+125".length
+    )
+  }
+
+  test("opt parsing works") {
+    val optOpti = optimise(opt(digit2Int))
+
+    checkSuccess(optOpti, CharReader("2".toArray))(
+      expected = Some(2),
+      expectedPos = "2".length
+    )
+
+    checkSuccess(optOpti, CharReader("a".toArray))(
+      expected = None,
+      expectedPos = 0
+    )
+
+  }
+
   test("json parser works") {
 
     sealed abstract class JSValue
     case class JSObject(dict: List[(String, JSValue)]) extends JSValue
     case class JSArray(arr: List[JSValue]) extends JSValue
-    case class JSDouble(d: Int) extends JSValue
+    case class JSDouble(d: Double) extends JSValue
     case class JSString(s: String) extends JSValue
     case class JSBool(b: Boolean) extends JSValue
     case object JSNull extends JSValue
 
     val jsonParser = optimise {
 
-      def main: Parser[JSValue] = (
+      def value: Parser[JSValue] = (
         obj |
         arr |
         stringLiteral.map(x => JSString(x)) |
-        number.map(x => JSDouble(x)) |
+        double.map(x => JSDouble(x)) |
         accept("null").map(_ => JSNull) |
         accept("true").map(_ => JSBool(true)) |
         accept("false").map(_ => JSBool(false))
       )
 
-      def obj: Parser[JSValue] = (
-        skipWs(accept('{')) ~> repsep(member, skipWs(accept(','))) <~ skipWs(accept('}'))
-      ) map { x => JSObject(x) }
+      def obj: Parser[JSValue] = (skipWs(accept('{')) ~>
+        repsep(member, skipWs(accept(',')))
+      <~ skipWs(accept('}'))) map { x => JSObject(x) }
 
-      def arr: Parser[JSValue] = (
-        skipWs(accept('[')) ~> repsep(main, skipWs(accept(','))) <~ skipWs(accept(']'))
-      ) map { x => JSArray(x) }
+      def arr: Parser[JSValue] = (skipWs(accept('[')) ~>
+        repsep(value, skipWs(accept(',')))
+      <~ skipWs(accept(']'))) map { x => JSArray(x) }
 
       def member: Parser[(String, JSValue)] =
-        stringLiteral ~ (skipWs(accept(':')) ~> main)
+        stringLiteral ~ (skipWs(accept(':')) ~> value)
 
-      main
+      value
     }
 
     val bool = "true".toArray
@@ -251,7 +299,9 @@ class OptimisedParserSuite
       "name" : {
         "first": "Roger",
         "last": "Federer"
-      }
+      },
+      "magic_number": 1.2345456e+28,
+      "quotable": "Je suis LE \"Roger\" que vous attendiez"
     }""".toArray
 
     checkSuccess(jsonParser, CharReader(bool))(
@@ -270,12 +320,16 @@ class OptimisedParserSuite
     )
 
     checkSuccess(jsonParser, CharReader(oneObj))(
-      expected = JSObject(List(("name", JSObject(
-        List(
-          ("first", JSString("Roger")),
-          ("last", JSString("Federer"))
-        )
-      )))),
+      expected = JSObject(List(
+        ("name", JSObject(
+          List(
+            ("first", JSString("Roger")),
+            ("last", JSString("Federer"))
+          )
+        )),
+        ("magic_number", JSDouble(1.2345456e+28)),
+        ("quotable", JSString("""Je suis LE "Roger" que vous attendiez"""))
+      )),
       expectedPos = oneObj.length
     )
   }
