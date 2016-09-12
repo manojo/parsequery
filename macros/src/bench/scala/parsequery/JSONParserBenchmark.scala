@@ -25,10 +25,6 @@ object JSONBenchmark extends Bench.Group {
   performance of "ParsequeryJSON" in {
     include (new ParsequeryJSONBenchmark {})
   }
-
-  performance of "ParsequeryTweet" in {
-    include (new ParsequeryTweetBenchmark {})
-  }
 }
 
 
