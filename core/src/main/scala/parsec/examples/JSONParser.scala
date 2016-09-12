@@ -13,7 +13,7 @@ trait JSONParsers extends OptimisedParsers {
   case class JSBool(b: Boolean) extends JSValue
   case object JSNull extends JSValue
 
-  val jsonParser = {// optimise {
+  val jsonParser = optimise {
 
     def value: Parser[JSValue] = (
       obj |

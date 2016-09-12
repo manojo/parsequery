@@ -121,8 +121,8 @@ class OptimisedParsersImpl(val c: Context)
     ).toMap
 
     /**** Logging ****/
-    println("Grammars before parsequery phase")
-    for ((_, ParserDecl(_, _, _, g)) <- ruleMap) println(g)
+//    println("Grammars before parsequery phase")
+//    for ((_, ParserDecl(_, _, _, g)) <- ruleMap) println(g)
 
     /**
      * We transform each parser according to the
@@ -130,15 +130,15 @@ class OptimisedParsersImpl(val c: Context)
      * transformation independently on each parser.
      * TODO: propagate from finalG to all others
      */
-//    val transformedGrammars = ruleMap
-    val transformedGrammars: Map[TermName, ParserDecl] = {
-      for ((name, ParserDecl(n, t, r, g)) <- ruleMap)
-      yield (name -> ParserDecl(n, t, r, transform(g)))
-    }
+    val transformedGrammars = ruleMap
+//    val transformedGrammars: Map[TermName, ParserDecl] = {
+//      for ((name, ParserDecl(n, t, r, g)) <- ruleMap)
+//      yield (name -> ParserDecl(n, t, r, transform(g)))
+//    }
 
     /**** Logging ****/
-    println("Grammars AFTER parsequery phase")
-    for ((_, ParserDecl(_, _, _, g)) <- transformedGrammars) println(g)
+//    println("Grammars AFTER parsequery phase")
+//    for ((_, ParserDecl(_, _, _, g)) <- transformedGrammars) println(g)
 
     /**
      * we finally stage each parser we see, i.e.
@@ -224,15 +224,15 @@ class OptimisedParsersImpl(val c: Context)
    */
   def optimise(parserBlock: c.Tree) = parserBlock match {
     case q"{..$statements}" =>
-      println("BEFORE TRANSFORMATION")
-      println(showCode(parserBlock))
+//      println("BEFORE TRANSFORMATION")
+//      println(showCode(parserBlock))
 
       val pBlock = createParserBlock(statements)
       val transformed = transform(pBlock)
 
-      println("AFTER TRANSFORMATION")
-      println(showCode(transformed))
-      println()
+//      println("AFTER TRANSFORMATION")
+//      println(showCode(transformed))
+//      println()
       transformed
 
     case _ =>

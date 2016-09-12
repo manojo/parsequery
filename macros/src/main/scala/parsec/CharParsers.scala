@@ -60,7 +60,7 @@ trait CharParsers extends Parsers with RepetitionParsers {
       val res = in.source.subSequence(in.pos, curIn.pos).toString.toDouble
       Success(res, curIn)
     } catch {
-      case _ => Failure("could not parse a double", in)
+      case _: Throwable => Failure("could not parse a double", in)
     }
   }
 
