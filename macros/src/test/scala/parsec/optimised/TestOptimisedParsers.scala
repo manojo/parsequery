@@ -241,6 +241,21 @@ class OptimisedParserSuite
     )
   }
 
+  test("opt parsing works") {
+    val optOpti = optimise(opt(digit2Int))
+
+    checkSuccess(optOpti, CharReader("2".toArray))(
+      expected = Some(2),
+      expectedPos = "2".length
+    )
+
+    checkSuccess(optOpti, CharReader("a".toArray))(
+      expected = None,
+      expectedPos = 0
+    )
+
+  }
+
   test("json parser works") {
 
     sealed abstract class JSValue

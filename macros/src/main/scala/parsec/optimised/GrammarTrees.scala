@@ -33,6 +33,7 @@ trait GrammarTrees { self: TreeTools =>
   case class ConcatLeft(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(l.tpe)
   case class ConcatRight(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(tpe2)
   case class Or(l: Grammar, r: Grammar, tpe2: Type) extends Grammar(tpe2)
+  case class Opt(g: Grammar) extends Grammar(appliedType(typeOf[Option[_]], List(g.tpe)))
   /**
    * we actually want the original tree
    * only the transformation phase will work on creating a new one
@@ -72,6 +73,7 @@ trait GrammarTrees { self: TreeTools =>
     case q"$_.rep[${t: Type}](${g: Grammar})" => Rep(g, t)
     case q"$_.repsep[${t: Type}, ${u: Type}](${g: Grammar}, ${sep: Grammar})" =>
       Repsep(g, sep, t, u)
+    case q"$_.opt[${t: Type}](${g: Grammar})" => Opt(g)
 
     /** base parsers */
     case q"(..$p).acceptIf($f)"         => AcceptIf(p, elem => q"$f($elem)")
@@ -117,6 +119,7 @@ trait GrammarTrees { self: TreeTools =>
     case Or(l, r, t) => q"$l |[$t] $r"
     case Rep(g, t) => q"rep[$t]($g)"
     case Repsep(g, sep, t, u) => q"repsep[$t, $u]($g, $sep)"
+    case Opt(g) => q"opt[${g.tpe}]($g)"
 
     /** base parsers */
     case AcceptIf(p, pred) =>
