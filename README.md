@@ -54,7 +54,7 @@ scope. Here is an example JSON parser:
   }
 ```
 
-To run this parser, you run it as follows:
+You run the parser as follows:
 
 ```scala
 
@@ -82,7 +82,9 @@ resolvers += Resolver.sonatypeRepo("snapshots")
 How fast is it?
 ---------------
 
-Check for yourself, by running the following two benchmarks:
+Check for yourself, by running the following two benchmarks, sources
+[here](macros/src/bench/scala/parsequery/BooleansBenchmark.scala) and
+[here](macros/src/bench/scala/parsequery/JSONBenchmark.scala):
 
 ```scala
 > bench:testOnly parsequery.BooleansBenchmark
@@ -98,7 +100,7 @@ The main goal of `parsequery` is to _systematically_ eliminate all intermediate
 data structures that are creating when running a traditional parser combinator
 program. Typically, parser combinators interleave _static_ composition of
 parsers with  the _dynamic_ act of parsing itself, at runtime. The key insight
-is that we can fully decouple the static parts from the dynamic one. This is
+is that we can fully decouple the static parts from the dynamic ones. This is
 done by leveraging a technique known as [partial
 evaluation](https://en.wikipedia.org/wiki/Partial_evaluation). To know more
 about the ideas check out the these blog posts on optimising [list
@@ -106,6 +108,8 @@ pipelines](http://manojo.github.io/2015/02/19/staging-foldleft) and [parser
 combinators](http://manojo.github.io/2015/09/02/staged-parser-combinators). A
 more detailed blog post catered to the current implementation is to appear soon.
 
-This implementation also heavily draws from a previous implementation, by the
-man called [Eric Béguet](https://github.com/begeric), found
-[here](https://github.com/begeric/FastParsers).
+This implementation draws inspiration from previous implementations in the
+[LMS](http://scala-lms.github.io/) framework, found [here](https://github.com/ma
+nojo/functadelic/tree/master/src/main/scala/stagedparsec)  and a macro
+implementation by the man called [Eric Béguet](https://github.com/begeric),
+found [here](https://github.com/begeric/FastParsers).
