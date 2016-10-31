@@ -108,6 +108,9 @@ pipelines](http://manojo.github.io/2015/02/19/staging-foldleft) and [parser
 combinators](http://manojo.github.io/2015/09/02/staged-parser-combinators). A
 more detailed blog post catered to the current implementation is to appear soon.
 
+You can find a talk about this [here](https://www.youtube.com/watch?v=Cc6QrgqsoVI) 
+and the accompanying slides [here](https://t.co/iDfP0lZBkp).
+
 This implementation draws inspiration from previous implementations in the
 [LMS](http://scala-lms.github.io/) framework, found [here](https://github.com/ma
 nojo/functadelic/tree/master/src/main/scala/stagedparsec)  and a macro
